@@ -1,0 +1,90 @@
+<!-- templates/admin/mahasiswa/kelola_mahasiswa.html -->
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kelola Mahasiswa</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/dist/css/adminlte.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/fontawesome-free/css/all.min.css') }}">
+</head>
+<body class="hold-transition sidebar-mini layout-fixed">
+    <div class="wrapper">
+
+        <!-- Navbar -->
+        {% include 'admin/navbar.html' %}
+
+        <!-- Main Sidebar Container -->
+        {% include 'admin/sidebar.html' %}
+
+        <!-- Content Wrapper -->
+        <div class="content-wrapper">
+            <!-- Content Header -->
+            <section class="content-header">
+                <div class="container-fluid">
+                    <div class="row mb-2">
+                        <div class="col-sm-6">
+                            <h1>Kelola Mahasiswa</h1>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Main content -->
+            <section class="content">
+                <div class="container-fluid">
+                    <!-- Tombol Tambah Mahasiswa -->
+                    <a href="{{ url_for('tambah_mahasiswa') }}" class="btn btn-primary mb-3">Tambah Mahasiswa</a>
+
+                    <!-- Tabel Daftar Mahasiswa -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Daftar Mahasiswa</h3>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>NIM</th>
+                                        <th>Nama</th>
+                                        <th>Email</th>
+                                        <th>Nomor HP</th>
+                                        <th>Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for mhs in mahasiswa %}
+                                    <tr>
+                                        <td>{{ mhs.nim }}</td>
+                                        <td>{{ mhs.nama }}</td>
+                                        <td>{{ mhs.email }}</td>
+                                        <td>{{ mhs.nomor_hp }}</td>
+                                        <td>
+                                            <!-- Tombol Edit -->
+                                            <a href="{{ url_for('edit_mahasiswa', id=mhs._id) }}" class="btn btn-warning btn-sm">Edit</a>
+                                            
+                                            <!-- Tombol Hapus -->
+                                            <form action="{{ url_for('hapus_mahasiswa', id=mhs._id) }}" method="post" style="display:inline;">
+                                                <button type="submit" class="btn btn-danger btn-sm">Hapus</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Footer -->
+        {% include 'admin/footer.html' %}
+    </div>
+
+    <!-- Script JS AdminLTE -->
+    <script src="{{ url_for('static', filename='admin_lte/plugins/jquery/jquery.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin_lte/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin_lte/dist/js/adminlte.min.js') }}"></script>
+</body>
+</html>

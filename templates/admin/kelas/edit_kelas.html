@@ -1,0 +1,91 @@
+<!-- templates/admin/kelas/edit_kelas.html -->
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Kelas</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/dist/css/adminlte.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/fontawesome-free/css/all.min.css') }}">
+</head>
+<body class="hold-transition sidebar-mini layout-fixed">
+    <div class="wrapper">
+
+        <!-- Navbar -->
+        {% include 'admin/navbar.html' %}
+
+        <!-- Main Sidebar Container -->
+        {% include 'admin/sidebar.html' %}
+
+        <!-- Content Wrapper -->
+        <div class="content-wrapper">
+            <!-- Content Header -->
+            <section class="content-header">
+                <div class="container-fluid">
+                    <div class="row mb-2">
+                        <div class="col-sm-6">
+                            <h1>Edit Kelas</h1>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Main content -->
+            <section class="content">
+                <div class="container-fluid">
+                    <div class="card card-primary">
+                        <div class="card-header">
+                            <h3 class="card-title">Formulir Edit Kelas</h3>
+                        </div>
+                        <!-- Form Start -->
+                        <form action="{{ url_for('edit_kelas', id=kelas._id) }}" method="POST">
+                            <div class="card-body">
+                                <div class="form-group">
+                                    <label for="nama_kelas">Nama Kelas</label>
+                                    <input type="text" name="nama_kelas" class="form-control" id="nama_kelas" value="{{ kelas.nama_kelas }}" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="dosen_pengampu">Dosen Pengampu</label>
+                                    <select name="dosen_pengampu" class="form-control" id="dosen_pengampu" required>
+                                        {% for dosen in daftar_dosen %}
+                                            <option value="{{ dosen._id }}" {% if dosen._id == kelas.dosen_pengampu %}selected{% endif %}>{{ dosen.nama }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="jadwal_kelas">Jadwal Kelas</label>
+                                    <input type="text" name="jadwal_kelas" class="form-control" id="jadwal_kelas" value="{{ kelas.jadwal_kelas }}" required>
+                                </div>
+
+                                <!-- Bagian untuk Mahasiswa -->
+                                <div class="form-group">
+                                    <label for="mahasiswa">Pilih Mahasiswa</label>
+                                    <select name="mahasiswa[]" class="form-control" id="mahasiswa" multiple required>
+                                        {% for mahasiswa in semua_mahasiswa %}
+                                            <option value="{{ mahasiswa._id }}" {% if mahasiswa._id in kelas.mahasiswa %}selected{% endif %}>{{ mahasiswa.nama }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <small class="form-text text-muted">Pilih satu atau lebih mahasiswa yang tergabung dalam kelas ini.</small>
+                                </div>
+                            </div>
+                            <!-- /.card-body -->
+                            <div class="card-footer">
+                                <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+                            </div>
+                        </form>
+                    </div>
+                    <!-- /.card -->
+                </div>
+            </section>
+        </div>
+
+        <!-- Footer -->
+        {% include 'admin/footer.html' %}
+    </div>
+
+    <!-- Script JS AdminLTE -->
+    <script src="{{ url_for('static', filename='admin_lte/plugins/jquery/jquery.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin_lte/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin_lte/dist/js/adminlte.min.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!-- templates/admin/absensi/laporan_absensi.html -->
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laporan Absensi</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/dist/css/adminlte.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/fontawesome-free/css/all.min.css') }}">
+</head>
+<body class="hold-transition sidebar-mini layout-fixed">
+    <div class="wrapper">
+
+        <!-- Navbar -->
+        {% include 'admin/navbar.html' %}
+
+        <!-- Main Sidebar Container -->
+        {% include 'admin/sidebar.html' %}
+
+        <!-- Content Wrapper -->
+        <div class="content-wrapper">
+            <!-- Content Header -->
+            <section class="content-header">
+                <div class="container-fluid">
+                    <div class="row mb-2">
+                        <div class="col-sm-6">
+                            <h1>Laporan Absensi</h1>
+                        </div>
+                        <div class="col-sm-6">
+                            <a href="{{ url_for('unduh_laporan_absensi') }}" class="btn btn-success float-sm-right">Unduh Laporan</a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Main content -->
+            <section class="content">
+                <div class="container-fluid">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Daftar Laporan Absensi</h3>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>Tanggal</th>
+                                        <th>Nama Kelas</th>
+                                        <th>Nama Mahasiswa</th>
+                                        <th>Status Kehadiran</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for absensi in laporan_absensi %}
+                                    <tr>
+                                        <td>{{ absensi.tanggal }}</td>
+                                        <td>{{ absensi.nama_kelas }}</td>
+                                        <td>{{ absensi.nama_mahasiswa }}</td>
+                                        <td>{{ absensi.status }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Footer -->
+        {% include 'admin/footer.html' %}
+    </div>
+
+    <!-- Script JS AdminLTE -->
+    <script src="{{ url_for('static', filename='admin_lte/plugins/jquery/jquery.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin_lte/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin_lte/dist/js/adminlte.min.js') }}"></script>
+</body>
+</html>

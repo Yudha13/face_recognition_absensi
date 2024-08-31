@@ -1,0 +1,105 @@
+<!-- templates/admin/dashboard.html -->
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Admin</title>
+    <!-- Link ke CSS AdminLTE -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/dist/css/adminlte.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/fontawesome-free/css/all.min.css') }}">
+</head>
+<body class="hold-transition sidebar-mini layout-fixed">
+    <div class="wrapper">
+
+        <!-- Navbar -->
+        {% include 'admin/navbar.html' %}
+
+        <!-- Main Sidebar Container -->
+        {% include 'admin/sidebar.html' %}
+
+        <!-- Content Wrapper. Contains page content -->
+        <div class="content-wrapper">
+            <!-- Content Header (Page header) -->
+            <section class="content-header">
+                <div class="container-fluid">
+                    <div class="row mb-2">
+                        <div class="col-sm-6">
+                            <h1>Dashboard</h1>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Main content -->
+            <section class="content">
+                <div class="container-fluid">
+                    <div class="row">
+                        <div class="col-lg-3 col-6">
+                            <!-- small box -->
+                            <div class="small-box bg-info">
+                                <div class="inner">
+                                    <h3>{{ jumlah_mahasiswa }}</h3>
+                                    <p>Mahasiswa</p>
+                                </div>
+                                <div class="icon">
+                                    <i class="fas fa-user-graduate"></i>
+                                </div>
+                                <a href="{{ url_for('kelola_mahasiswa') }}" class="small-box-footer">Info lebih lanjut <i class="fas fa-arrow-circle-right"></i></a>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-6">
+                            <!-- small box -->
+                            <div class="small-box bg-success">
+                                <div class="inner">
+                                    <h3>{{ jumlah_dosen }}</h3>
+                                    <p>Dosen</p>
+                                </div>
+                                <div class="icon">
+                                    <i class="fas fa-chalkboard-teacher"></i>
+                                </div>
+                                <a href="{{ url_for('kelola_dosen') }}" class="small-box-footer">Info lebih lanjut <i class="fas fa-arrow-circle-right"></i></a>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-6">
+                            <!-- small box -->
+                            <div class="small-box bg-warning">
+                                <div class="inner">
+                                    <h3>{{ jumlah_kelas }}</h3>
+                                    <p>Kelas</p>
+                                </div>
+                                <div class="icon">
+                                    <i class="fas fa-book"></i>
+                                </div>
+                                <a href="{{ url_for('kelola_kelas') }}" class="small-box-footer">Info lebih lanjut <i class="fas fa-arrow-circle-right"></i></a>
+                            </div>
+                        </div>
+                        <div class="col-lg-3 col-6">
+                            <!-- small box -->
+                            <div class="small-box bg-danger">
+                                <div class="inner">
+                                    <h3>{{ jumlah_laporan_absensi }}</h3>
+                                    <p>Laporan Absensi</p>
+                                </div>
+                                <div class="icon">
+                                    <i class="fas fa-calendar-alt"></i>
+                                </div>
+                                <a href="{{ url_for('laporan_absensi') }}" class="small-box-footer">Info lebih lanjut <i class="fas fa-arrow-circle-right"></i></a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Footer -->
+        {% include 'admin/footer.html' %}
+
+    </div>
+
+    <!-- Script JS AdminLTE -->
+    <script src="{{ url_for('static', filename='admin_lte/plugins/jquery/jquery.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin_lte/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin_lte/dist/js/adminlte.min.js') }}"></script>
+</body>
+</html>

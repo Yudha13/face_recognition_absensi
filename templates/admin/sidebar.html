@@ -1,0 +1,67 @@
+<!-- templates/admin/sidebar.html -->
+<aside class="main-sidebar sidebar-dark-primary elevation-4">
+    <!-- Brand Logo -->
+    <a href="{{ url_for('admin_dashboard') }}" class="brand-link">
+        <span class="brand-text font-weight-light">Admin Dashboard</span>
+    </a>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <!-- Sidebar user panel (optional) -->
+        <div class="user-panel mt-3 pb-3 mb-3 d-flex">
+            <div class="image">
+                <img src="{{ url_for('static', filename='admin_lte/dist/img/user2-160x160.jpg') }}" class="img-circle elevation-2" alt="User Image">
+            </div>
+            <div class="info">
+                <a href="#" class="d-block">Admin</a>
+            </div>
+        </div>
+
+        <!-- Sidebar Menu -->
+        <nav class="mt-2">
+            <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
+                <!-- Dashboard -->
+                <li class="nav-item">
+                    <a href="{{ url_for('admin_dashboard') }}" class="nav-link">
+                        <i class="nav-icon fas fa-tachometer-alt"></i>
+                        <p>Dashboard</p>
+                    </a>
+                </li>
+
+                <!-- Kelola Mahasiswa -->
+                <li class="nav-item">
+                    <a href="{{ url_for('kelola_mahasiswa') }}" class="nav-link">
+                        <i class="nav-icon fas fa-users"></i>
+                        <p>Kelola Mahasiswa</p>
+                    </a>
+                </li>
+
+                <!-- Kelola Dosen -->
+                <li class="nav-item">
+                    <a href="{{ url_for('kelola_dosen') }}" class="nav-link">
+                        <i class="nav-icon fas fa-chalkboard-teacher"></i>
+                        <p>Kelola Dosen</p>
+                    </a>
+                </li>
+
+                <!-- Kelola Kelas -->
+                <li class="nav-item">
+                    <a href="{{ url_for('kelola_kelas') }}" class="nav-link">
+                        <i class="nav-icon fas fa-book"></i>
+                        <p>Kelola Kelas</p>
+                    </a>
+                </li>
+
+                <!-- Laporan Absensi -->
+                <li class="nav-item">
+                    <a href="{{ url_for('laporan_absensi') }}" class="nav-link">
+                        <i class="nav-icon fas fa-calendar-alt"></i>
+                        <p>Laporan Absensi</p>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+        <!-- /.sidebar-menu -->
+    </div>
+    <!-- /.sidebar -->
+</aside>
