@@ -1,5 +1,5 @@
 
-# Face Recognition Absensi
+# Absensi Face Recognition
 
 ![Logo](./docs/logo.png)
 
