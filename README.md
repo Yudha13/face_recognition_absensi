@@ -14,14 +14,6 @@ Berikut adalah perkembangan penting dalam proyek ini:
 - **1/09/2024**: Implementasi Dashboard Admin dan fitur CRUD (Create, Read, Update, Delete).
 - **2/09/2024**: Implementasi Dashboard Dosen dan fitur CRUD yang relevan.
 
-## ▶️ Cara Menjalankan Aplikasi
-Pastikan MongoDB sudah berjalan dengan benar di sistem Anda.
-
-Untuk memulai aplikasi, jalankan skrip berikut:
-```bash
-./run_app.sh
-```
-
 ## 🎯 Fitur Utama
 - **Pengenalan Wajah:** Penggunaan teknologi pengenalan wajah untuk memastikan kehadiran yang akurat.
 - **Manajemen Admin:** Admin dapat mengelola data dosen, mahasiswa, kelas, dan laporan absensi.
