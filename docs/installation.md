@@ -1,10 +1,10 @@
 
 # Panduan Instalasi
 
-Panduan ini akan membantu Anda mengatur sistem Face Recognition Absensi di mesin lokal Anda.
+Panduan ini akan membantu Anda mengatur sistem Face Recognition Absensi di device anda.
 
-## Prasyarat
-Sebelum menginstal, pastikan Anda memiliki hal-hal berikut:
+## Requirements
+Sebelum menginstal, siapkan hal-hal berikut:
 - Python 3.7+
 - MongoDB
 - Raspberry Pi (untuk deployment)
