@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unduh Rekap Absensi - Sistem Absensi Dosen</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/dist/css/adminlte.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/fontawesome-free/css/all.min.css') }}">
+</head>
+<body class="hold-transition sidebar-mini">
+<div class="wrapper">
+
+    <!-- Navbar dan Sidebar -->
+    {% include 'main/navbar.html' %}
+    {% include 'main/sidebar.html' %}
+
+    <!-- Content Wrapper -->
+    <div class="content-wrapper">
+        <!-- Content Header -->
+        <section class="content-header">
+            <div class="container-fluid">
+                <div class="row mb-2">
+                    <div class="col-sm-6">
+                        <h1>Unduh Rekap Absensi</h1>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Content -->
+        <section class="content">
+            <div class="container-fluid">
+                <div class="card">
+                    <div class="card-body">
+                        <p>Anda dapat mengunduh rekap absensi dari kelas-kelas yang Anda ajar dengan mengklik tombol di bawah ini.</p>
+                        <a href="{{ url_for('dosen_unduh_absensi') }}" class="btn btn-success">Unduh Rekap Absensi</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    {% include 'main/footer.html' %}
+</div>
+
+<script src="{{ url_for('static', filename='admin_lte/plugins/jquery/jquery.min.js') }}"></script>
+<script src="{{ url_for('static', filename='admin_lte/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='admin_lte/dist/js/adminlte.min.js') }}"></script>
+</body>
+</html>

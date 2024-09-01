@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daftar Kelas - Sistem Absensi Dosen</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/dist/css/adminlte.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/fontawesome-free/css/all.min.css') }}">
+</head>
+<body class="hold-transition sidebar-mini">
+<div class="wrapper">
+
+    <!-- Navbar dan Sidebar -->
+    {% include 'main/navbar.html' %}
+    {% include 'main/sidebar.html' %}
+
+    <!-- Content Wrapper -->
+    <div class="content-wrapper">
+        <!-- Content Header -->
+        <section class="content-header">
+            <div class="container-fluid">
+                <div class="row mb-2">
+                    <div class="col-sm-6">
+                        <h1>Daftar Kelas yang Anda Ajar</h1>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Content -->
+        <section class="content">
+            <div class="container-fluid">
+                <div class="row">
+                    {% for kelas in kelas_list %}
+                    <div class="col-lg-4 col-6">
+                        <div class="small-box 
+                            {% if loop.index % 4 == 1 %} bg-info
+                            {% elif loop.index % 4 == 2 %} bg-success
+                            {% elif loop.index % 4 == 3 %} bg-warning
+                            {% else %} bg-danger
+                            {% endif %}">
+                            <div class="inner">
+                                <h4>{{ kelas.nama_kelas }}</h4>
+                                <p>{{ kelas.jadwal_kelas }}</p>
+                                <p>Total Mahasiswa: {{ kelas.mahasiswa | length }}</p>
+                            </div>
+                            <div class="icon">
+                                <i class="fas fa-chalkboard"></i>
+                            </div>
+                            <a href="{{ url_for('dosen_detail_kelas', id=kelas._id) }}" class="small-box-footer">
+                                Detail Kelas <i class="fas fa-arrow-circle-right"></i>
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    {% include 'main/footer.html' %}
+</div>
+
+<script src="{{ url_for('static', filename='admin_lte/plugins/jquery/jquery.min.js') }}"></script>
+<script src="{{ url_for('static', filename='admin_lte/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='admin_lte/dist/js/adminlte.min.js') }}"></script>
+</body>
+</html>

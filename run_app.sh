@@ -3,11 +3,10 @@
 # Navigasi ke direktori proyek
 cd "$(dirname "$0")"
 
-# Mengaktifkan virtual environment
+# Menjalankan MongoDB di terminal terpisah
+gnome-terminal -- bash -c "mongod --dbpath ./db --logpath ./db/mongod.log --fork; exec bash"
+
+# Mengaktifkan virtual environment dan menjalankan Flask app dalam terminal ini
 source ./venv/bin/activate
-
-# Menjalankan MongoDB
-mongod --dbpath ./db --logpath ./db/mongod.log --fork
-
-# Menjalankan Flask app
 python3 app.py
+

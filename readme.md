@@ -3,7 +3,11 @@
 ## Deskripsi Proyek
 Proyek ini adalah sistem absensi berbasis pengenalan wajah yang dikembangkan menggunakan Flask, MongoDB, dan Raspberry Pi. Sistem ini memungkinkan admin untuk mengelola data dosen, mahasiswa, kelas, serta laporan absensi.
 
-Sistem ini sampai pada tahap CRUD pada User admin dan fungsional nya
+# Sistem ini masih dalam tahap pengembangan Dan belum selesai
+## log pengembangan app 
+1/09/2024 Dashboard Admin dan fungsi CRUD
+2/09/2024 Dashboard Dosen dan fungsi CRUD
+
 
 ## Instalasi
 
@@ -25,10 +29,6 @@ Sistem ini sampai pada tahap CRUD pada User admin dan fungsional nya
 Pastikan MongoDB berjalan dengan benar.
 Jalankan skrip run_app.sh untuk memulai aplikasi:
     $./run_app.sh
-
-## pengembangan app selanjutnya
-Integrasi sistem face recognition.
-Penambahan fitur-fitur lain yang relevan.
 
 
 

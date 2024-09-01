@@ -310,7 +310,147 @@ def unduh_laporan_absensi():
         return send_file(file_path, as_attachment=True)
     else:
         return redirect(url_for('admin_login'))
+    
+########################################
+# Pada Bagian ini adalah rute untuk dosen
+########################################
 
+# Rute Login Dosen
+@app.route('/dosen/login', methods=['GET', 'POST'])
+def dosen_login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        # Cari user dosen di database MongoDB
+        dosen = db.dosen.find_one({"username": username})
+
+        if dosen and dosen['password'] == password:  # Jika password tidak di-hash
+            session['dosen_logged_in'] = True
+            session['dosen_id'] = str(dosen['_id'])  # Simpan ID dosen ke session
+            session['dosen_name'] = dosen['nama']    # Simpan nama dosen ke session
+            return redirect(url_for('dosen_dashboard'))
+        else:
+            error = 'Login Gagal: Username atau Password salah.'
+            return render_template('main/login.html', error=error)
+    return render_template('main/login.html')
+
+# Rute Logout Dosen
+@app.route('/dosen/logout')
+def dosen_logout():
+    session.pop('dosen_logged_in', None)
+    session.pop('dosen_id', None)
+    session.pop('dosen_name', None)
+    return redirect(url_for('dosen_login'))
+
+# Rute Dashboard Dosen
+@app.route('/dosen/dashboard')
+def dosen_dashboard():
+    if 'dosen_logged_in' in session:
+        dosen_id = session.get('dosen_id')
+        kelas_list = list(db.kelas.find({"dosen_pengampu": ObjectId(dosen_id)}))
+        
+        # Mengambil semua ObjectId mahasiswa dari kelas yang diajar
+        mahasiswa_ids = [ObjectId(mahasiswa_id) for kelas in kelas_list for mahasiswa_id in kelas['mahasiswa']]
+        
+        # Menghitung jumlah mahasiswa berdasarkan mahasiswa_ids
+        mahasiswa_count = db.mahasiswa.count_documents({"_id": {"$in": mahasiswa_ids}})
+        
+        # Menghitung jumlah absensi berdasarkan kelas yang diajar
+        absensi_count = db.absensi.count_documents({"kelas_id": {"$in": [ObjectId(kelas['_id']) for kelas in kelas_list]}})
+        
+        return render_template('main/dashboard.html', 
+                               kelas_list=kelas_list, 
+                               mahasiswa_count=mahasiswa_count,
+                               absensi_count=absensi_count, 
+                               dosen_name=session.get('dosen_name'))
+    else:
+        return redirect(url_for('dosen_login'))
+
+#rute list kelas
+@app.route('/dosen/kelas')
+def dosen_kelas():
+    if 'dosen_logged_in' in session:
+        dosen_id = session.get('dosen_id')
+        kelas_list = list(db.kelas.find({"dosen_pengampu": ObjectId(dosen_id)}))
+        return render_template('main/kelas/lihat_kelas.html', kelas_list=kelas_list)
+    else:
+        return redirect(url_for('dosen_login'))
+
+# Rute untuk Melihat Detail Kelas yang Diajar oleh Dosen
+@app.route('/dosen/kelas/<id>')
+def dosen_detail_kelas(id):
+    if 'dosen_logged_in' in session:
+        kelas = db.kelas.find_one({"_id": ObjectId(id)})
+        mahasiswa_list = db.mahasiswa.find({"_id": {"$in": kelas['mahasiswa']}})
+        return render_template('main/kelas/detail_kelas.html', kelas=kelas, mahasiswa_list=mahasiswa_list)
+    else:
+        return redirect(url_for('dosen_login'))
+
+# Rute untuk Melihat Daftar Mahasiswa yang Berkaitan dengan Dosen
+@app.route('/dosen/mahasiswa')
+def dosen_mahasiswa():
+    if 'dosen_logged_in' in session:
+        dosen_id = session.get('dosen_id')
+        kelas_list = list(db.kelas.find({"dosen_pengampu": ObjectId(dosen_id)}))
+        mahasiswa_ids = set()
+        for kelas in kelas_list:
+            mahasiswa_ids.update(kelas['mahasiswa'])
+        mahasiswa_list = list(db.mahasiswa.find({"_id": {"$in": list(mahasiswa_ids)}}))
+        return render_template('main/mahasiswa/lihat_mahasiswa.html', mahasiswa_list=mahasiswa_list)
+    else:
+        return redirect(url_for('dosen_login'))
+
+# Rute untuk Melihat Detail Mahasiswa
+@app.route('/dosen/mahasiswa/<id>')
+def dosen_detail_mahasiswa(id):
+    if 'dosen_logged_in' in session:
+        mahasiswa = db.mahasiswa.find_one({"_id": ObjectId(id)})
+        return render_template('main/mahasiswa/detail_mahasiswa.html', mahasiswa=mahasiswa)
+    else:
+        return redirect(url_for('dosen_login'))
+
+# Rute untuk Melihat Rekap Absensi
+@app.route('/dosen/absensi')
+def dosen_absensi():
+    if 'dosen_logged_in' in session:
+        dosen_id = session.get('dosen_id')
+        kelas_list = list(db.kelas.find({"dosen_pengampu": ObjectId(dosen_id)}))
+        absensi_list = []
+        for kelas in kelas_list:
+            absensi_list.extend(list(db.absensi.find({"kelas_id": ObjectId(kelas['_id'])})))
+        return render_template('main/absensi/lihat_absensi.html', absensi_list=absensi_list)
+    else:
+        return redirect(url_for('dosen_login'))
+
+# Rute untuk Mengunduh Rekap Absensi
+@app.route('/dosen/unduh_absensi')
+def dosen_unduh_absensi():
+    if 'dosen_logged_in' in session:
+        dosen_id = session.get('dosen_id')
+        kelas_list = list(db.kelas.find({"dosen_pengampu": ObjectId(dosen_id)}))
+        absensi_list = []
+        for kelas in kelas_list:
+            absensi_list.extend(list(db.absensi.find({"kelas_id": ObjectId(kelas['_id'])})))
+        
+        # Buat laporan absensi ke Excel atau format lainnya sesuai kebutuhan
+        import pandas as pd
+        data = [{
+            "Tanggal": absensi['tanggal'],
+            "Nama Kelas": db.kelas.find_one({"_id": ObjectId(absensi['kelas_id'])})['nama_kelas'],
+            "Nama Mahasiswa": db.mahasiswa.find_one({"_id": ObjectId(absensi['mahasiswa_id'])})['nama'],
+            "Status Kehadiran": absensi['status']
+        } for absensi in absensi_list]
+
+        df = pd.DataFrame(data)
+        file_path = "/tmp/rekap_absensi.xlsx"
+        df.to_excel(file_path, index=False)
+
+        return send_file(file_path, as_attachment=True)
+    else:
+        return redirect(url_for('dosen_login'))
+
+# End of route
 
 if __name__ == '__main__':
     app.run(debug=True)

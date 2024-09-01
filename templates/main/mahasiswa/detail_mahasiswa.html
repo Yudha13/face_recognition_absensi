@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detail Mahasiswa - Sistem Absensi Dosen</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/dist/css/adminlte.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/fontawesome-free/css/all.min.css') }}">
+</head>
+<body class="hold-transition sidebar-mini">
+<div class="wrapper">
+
+    <!-- Navbar dan Sidebar -->
+    {% include 'main/navbar.html' %}
+    {% include 'main/sidebar.html' %}
+
+    <!-- Content Wrapper -->
+    <div class="content-wrapper">
+        <!-- Content Header -->
+        <section class="content-header">
+            <div class="container-fluid">
+                <div class="row mb-2">
+                    <div class="col-sm-6">
+                        <h1>Detail Mahasiswa: {{ mahasiswa.nama }}</h1>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Content -->
+        <section class="content">
+            <div class="container-fluid">
+                <div class="card">
+                    <div class="card-body">
+                        <dl class="row">
+                            <dt class="col-sm-4">Nama</dt>
+                            <dd class="col-sm-8">{{ mahasiswa.nama }}</dd>
+
+                            <dt class="col-sm-4">NIM</dt>
+                            <dd class="col-sm-8">{{ mahasiswa.nim }}</dd>
+
+                            <dt class="col-sm-4">Email</dt>
+                            <dd class="col-sm-8">{{ mahasiswa.email }}</dd>
+
+                            <dt class="col-sm-4">Nomor HP</dt>
+                            <dd class="col-sm-8">{{ mahasiswa.nomor_hp }}</dd>
+
+                            <!-- Tambahkan informasi lainnya di sini jika ada -->
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    {% include 'main/footer.html' %}
+</div>
+
+<script src="{{ url_for('static', filename='admin_lte/plugins/jquery/jquery.min.js') }}"></script>
+<script src="{{ url_for('static', filename='admin_lte/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='admin_lte/dist/js/adminlte.min.js') }}"></script>
+</body>
+</html>
+
