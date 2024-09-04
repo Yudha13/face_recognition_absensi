@@ -224,27 +224,37 @@ def tambah_kelas():
 @app.route('/admin/edit_kelas/<id>', methods=['GET', 'POST'])
 def edit_kelas(id):
     if 'admin_logged_in' in session:
+        # Ambil data kelas berdasarkan ID
         kelas = db.kelas.find_one({"_id": ObjectId(id)})
         
         if request.method == 'POST':
+            # Ambil data dari form yang diinputkan user
             nama_kelas = request.form['nama_kelas']
-            dosen_pengampu = ObjectId(request.form['dosen_pengampu'])
+            dosen_pengampu = request.form['dosen_pengampu']
             jadwal_kelas = request.form['jadwal_kelas']
-            mahasiswa = [ObjectId(mhs_id) for mhs_id in request.form.getlist('mahasiswa[]')]
-            
+
+            # Periksa apakah dosen_pengampu valid sebelum mengubah menjadi ObjectId
+            if dosen_pengampu:
+                dosen_pengampu = ObjectId(dosen_pengampu)
+
+            # Update data kelas di database
             db.kelas.update_one({"_id": ObjectId(id)}, {
                 "$set": {
                     "nama_kelas": nama_kelas,
                     "dosen_pengampu": dosen_pengampu,
-                    "jadwal_kelas": jadwal_kelas,
-                    "mahasiswa": mahasiswa
+                    "jadwal_kelas": jadwal_kelas
                 }
             })
             return redirect(url_for('kelola_kelas'))
-        
-        daftar_dosen = db.dosen.find()
-        daftar_mahasiswa = db.mahasiswa.find()
-        return render_template('admin/kelas/edit_kelas.html', kelas=kelas, daftar_dosen=daftar_dosen, daftar_mahasiswa=daftar_mahasiswa)
+
+        # Ambil daftar dosen untuk dropdown list di menu
+        daftar_dosen = list(db.dosen.find())  # Mengonversi cursor ke list
+
+        # Debugging untuk memastikan daftar dosen diambil dengan benar
+        print(f"Debug: Daftar Dosen - {daftar_dosen}")
+        print(f"Debug: Kelas - {kelas}")
+
+        return render_template('admin/kelas/edit_kelas.html', kelas=kelas, daftar_dosen=daftar_dosen)
     else:
         return redirect(url_for('admin_login'))
 
@@ -433,7 +443,7 @@ def dosen_unduh_absensi():
         for kelas in kelas_list:
             absensi_list.extend(list(db.absensi.find({"kelas_id": ObjectId(kelas['_id'])})))
         
-        # Buat laporan absensi ke Excel atau format lainnya sesuai kebutuhan
+        # Buat laporan absensi ke Excel # testing fitur
         import pandas as pd
         data = [{
             "Tanggal": absensi['tanggal'],
@@ -450,7 +460,7 @@ def dosen_unduh_absensi():
     else:
         return redirect(url_for('dosen_login'))
 
-# End of route
+# sudah di ujung aspal
 
 if __name__ == '__main__':
     app.run(debug=True)

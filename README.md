@@ -13,6 +13,10 @@ Berikut adalah perkembangan penting dalam proyek ini:
 
 - **1/09/2024**: Implementasi Dashboard Admin dan fitur CRUD (Create, Read, Update, Delete).
 - **2/09/2024**: Implementasi Dashboard Dosen dan fitur CRUD yang relevan.
+- **4/09/2024**: Perbaikan fitur Edit Kelas:
+  - **Masalah Dropdown Dosen Tidak Muncul:** Dropdown untuk memilih dosen pengampu di halaman edit kelas tidak menampilkan daftar dosen. Masalah ini disebabkan oleh perbandingan `ObjectId` MongoDB dengan string di HTML template. Solusi yang diimplementasikan adalah penggunaan filter `|string` di Jinja2 untuk memastikan `ObjectId` dikonversi menjadi string sebelum dibandingkan.
+  - **Error `BadRequestKeyError: 'nama_kelas'`:** Error ini muncul karena field `nama_kelas` tidak ada di form, sehingga server tidak bisa memproses key tersebut. Setelah menambahkan kembali input `nama_kelas` di template, error teratasi.
+  - **Hasil Akhir:** Fitur edit kelas sekarang memungkinkan perubahan dosen pengampu, nama kelas, dan jadwal kelas dengan benar, dan perubahan tercermin di akun dosen terkait.
 
 ## 🎯 Fitur Utama
 - **Pengenalan Wajah:** Penggunaan teknologi pengenalan wajah untuk memastikan kehadiran yang akurat.
