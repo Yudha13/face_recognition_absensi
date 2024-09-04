@@ -11,6 +11,10 @@ app.secret_key = SECRET_KEY
 client = MongoClient(MONGO_URI)
 db = client[DB_NAME]
 
+#########################################
+#Pada Bagian ini adalah rute untuk admin#
+#########################################
+
 # Login Admin
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
@@ -105,7 +109,12 @@ def edit_mahasiswa(id):
 @app.route('/admin/hapus_mahasiswa/<id>', methods=['POST'])
 def hapus_mahasiswa(id):
     if 'admin_logged_in' in session:
+        # Hapus mahasiswa dari koleksi mahasiswa
         db.mahasiswa.delete_one({"_id": ObjectId(id)})
+
+        # Perbarui semua kelas yang memiliki mahasiswa ini
+        db.kelas.update_many({}, {"$pull": {"mahasiswa": ObjectId(id)}})
+
         return redirect(url_for('kelola_mahasiswa'))
     else:
         return redirect(url_for('admin_login'))
@@ -268,21 +277,25 @@ def hapus_kelas(id):
         return redirect(url_for('admin_login'))
 
 # Kelola Mahasiswa dalam Kelas
-@app.route('/admin/kelola_mahasiswa_kelas/<id>', methods=['GET', 'POST'])
-def kelola_mahasiswa_kelas(id):
+@app.route('/admin/kelola_kelas_mahasiswa/<id>', methods=['GET', 'POST'])
+def kelola_kelas_mahasiswa(id):
     if 'admin_logged_in' in session:
         kelas = db.kelas.find_one({"_id": ObjectId(id)})
-        daftar_mahasiswa = db.mahasiswa.find({"_id": {"$in": kelas["mahasiswa"]}})
+        daftar_mahasiswa = list(db.mahasiswa.find())
         
-        if request.method == 'POST':
-            mahasiswa = [ObjectId(mhs_id) for mhs_id in request.form.getlist('mahasiswa[]')]
-            db.kelas.update_one({"_id": ObjectId(id)}, {
-                "$set": {"mahasiswa": mahasiswa}
-            })
-            return redirect(url_for('kelola_kelas'))
+        return render_template('admin/kelas/kelola_kelas_mahasiswa.html', kelas=kelas, daftar_mahasiswa=daftar_mahasiswa)
+    else:
+        return redirect(url_for('admin_login'))
+
+@app.route('/admin/simpan_mahasiswa_ke_kelas/<id>', methods=['POST'])
+def simpan_mahasiswa_ke_kelas(id):
+    if 'admin_logged_in' in session:
+        mahasiswa_ids = [ObjectId(mhs_id) for mhs_id in request.form.getlist('mahasiswa[]')]
         
-        semua_mahasiswa = db.mahasiswa.find()
-        return render_template('admin/kelas/kelola_mahasiswa_kelas.html', kelas=kelas, daftar_mahasiswa=daftar_mahasiswa, semua_mahasiswa=semua_mahasiswa)
+        # Update kelas dengan mahasiswa yang dipilih
+        db.kelas.update_one({"_id": ObjectId(id)}, {"$set": {"mahasiswa": mahasiswa_ids}})
+        
+        return redirect(url_for('kelola_kelas'))
     else:
         return redirect(url_for('admin_login'))
 
@@ -321,9 +334,9 @@ def unduh_laporan_absensi():
     else:
         return redirect(url_for('admin_login'))
     
-########################################
-# Pada Bagian ini adalah rute untuk dosen
-########################################
+#########################################
+#Pada Bagian ini adalah rute untuk dosen#
+#########################################
 
 # Rute Login Dosen
 @app.route('/dosen/login', methods=['GET', 'POST'])

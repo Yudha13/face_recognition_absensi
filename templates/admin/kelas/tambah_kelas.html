@@ -39,47 +39,29 @@
                         </div>
                         <!-- Form Start -->
                         <form action="{{ url_for('tambah_kelas') }}" method="POST">
-                            <div class="card-body">
-                                <div class="form-group">
-                                    <label for="nama_kelas">Nama Kelas</label>
-                                    <input type="text" name="nama_kelas" class="form-control" id="nama_kelas" placeholder="Masukkan Nama Kelas" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="dosen_pengampu">Dosen Pengampu</label>
-                                    <select name="dosen_pengampu" class="form-control" id="dosen_pengampu" required>
-                                        <option value="">Pilih Dosen</option>
-                                        {% for dosen in daftar_dosen %}
-                                            <option value="{{ dosen._id }}">{{ dosen.nama }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label for="jadwal_kelas">Jadwal Kelas</label>
-                                    <input type="text" name="jadwal_kelas" class="form-control" id="jadwal_kelas" placeholder="Masukkan Jadwal Kelas" required>
-                                </div>
-
-                                <!-- Bagian untuk Mahasiswa -->
-                                <div class="form-group">
-                                    <label for="mahasiswa">Pilih Mahasiswa</label>
-                                    <select name="mahasiswa[]" class="form-control" id="mahasiswa" multiple required>
-                                        {% for mahasiswa in daftar_mahasiswa %}
-                                            <option value="{{ mahasiswa._id }}">{{ mahasiswa.nama }}</option>
-                                        {% endfor %}
-                                    </select>
-                                    <small class="form-text text-muted">Pilih satu atau lebih mahasiswa yang akan tergabung dalam kelas ini.</small>
-                                </div>
+                            <div class="form-group">
+                                <label for="nama_kelas">Nama Kelas</label>
+                                <input type="text" class="form-control" id="nama_kelas" name="nama_kelas" required>
                             </div>
-                            <!-- /.card-body -->
-                            <div class="card-footer">
-                                <button type="submit" class="btn btn-primary">Simpan</button>
+                        
+                            <div class="form-group">
+                                <label for="dosen_pengampu">Dosen Pengampu</label>
+                                <select class="form-control" id="dosen_pengampu" name="dosen_pengampu" required>
+                                    <option value="">Pilih Dosen</option>
+                                    {% for dosen in daftar_dosen %}
+                                    <option value="{{ dosen._id }}">{{ dosen.nama }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
+                        
+                            <div class="form-group">
+                                <label for="jadwal_kelas">Jadwal Kelas</label>
+                                <input type="text" class="form-control" id="jadwal_kelas" name="jadwal_kelas" required>
+                            </div>
+                        
+                            <button type="submit" class="btn btn-primary">Tambah Kelas</button>
                         </form>
-                    </div>
-                    <!-- /.card -->
-                </div>
-            </section>
-        </div>
-
+                        
         <!-- Footer -->
         {% include 'admin/footer.html' %}
     </div>

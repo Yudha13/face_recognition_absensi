@@ -1,6 +1,5 @@
-<!-- templates/admin/kelas/kelola_kelas.html -->
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,7 +13,7 @@
         <!-- Navbar -->
         {% include 'admin/navbar.html' %}
 
-        <!-- Main Sidebar Container -->
+        <!-- Sidebar -->
         {% include 'admin/sidebar.html' %}
 
         <!-- Content Wrapper -->
@@ -30,19 +29,17 @@
                 </div>
             </section>
 
-            <!-- Main content -->
+            <!-- Main Content -->
             <section class="content">
                 <div class="container-fluid">
-                    <!-- Tombol Tambah Kelas -->
-                    <a href="{{ url_for('tambah_kelas') }}" class="btn btn-primary mb-3">Tambah Kelas</a>
-
-                    <!-- Tabel Daftar Kelas -->
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title">Daftar Kelas</h3>
                         </div>
+
+                        <!-- Card Body -->
                         <div class="card-body">
-                            <table class="table table-bordered">
+                            <table class="table table-bordered table-hover">
                                 <thead>
                                     <tr>
                                         <th>Nama Kelas</th>
@@ -58,7 +55,7 @@
                                         <td>{{ kelas.nama_kelas }}</td>
                                         <td>{{ kelas.dosen.nama }}</td>
                                         <td>{{ kelas.jadwal_kelas }}</td>
-                                        <td>{{ kelas.mahasiswa|length }} Mahasiswa</td>
+                                        <td>{{ kelas.mahasiswa | length }} Mahasiswa</td> <!-- Menghitung jumlah mahasiswa di kelas -->
                                         <td>
                                             <!-- Tombol Edit -->
                                             <a href="{{ url_for('edit_kelas', id=kelas._id) }}" class="btn btn-warning btn-sm">Edit</a>
@@ -69,12 +66,17 @@
                                             </form>
 
                                             <!-- Tombol Kelola Mahasiswa -->
-                                            <a href="{{ url_for('kelola_mahasiswa_kelas', id=kelas._id) }}" class="btn btn-info btn-sm">Kelola Mahasiswa</a>
+                                            <a href="{{ url_for('kelola_kelas_mahasiswa', id=kelas._id) }}" class="btn btn-sm btn-warning">Kelola Mahasiswa</a>
                                         </td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>
                             </table>
+                        </div>
+
+                        <!-- Card Footer -->
+                        <div class="card-footer">
+                            <a href="{{ url_for('tambah_kelas') }}" class="btn btn-primary">Tambah Kelas Baru</a>
                         </div>
                     </div>
                 </div>
@@ -85,7 +87,7 @@
         {% include 'admin/footer.html' %}
     </div>
 
-    <!-- Script JS AdminLTE -->
+    <!-- Scripts -->
     <script src="{{ url_for('static', filename='admin_lte/plugins/jquery/jquery.min.js') }}"></script>
     <script src="{{ url_for('static', filename='admin_lte/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
     <script src="{{ url_for('static', filename='admin_lte/dist/js/adminlte.min.js') }}"></script>

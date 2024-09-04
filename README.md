@@ -9,14 +9,18 @@ Proyek ini adalah sistem absensi berbasis pengenalan wajah yang dibangun menggun
 **Catatan:** Sistem ini masih dalam tahap pengembangan dan belum sepenuhnya selesai.
 
 ## 🛠️ Log Pengembangan
-Berikut adalah perkembangan penting dalam proyek ini:
 
 - **1/09/2024**: Implementasi Dashboard Admin dan fitur CRUD (Create, Read, Update, Delete).
 - **2/09/2024**: Implementasi Dashboard Dosen dan fitur CRUD yang relevan.
-- **4/09/2024**: Perbaikan fitur Edit Kelas:
-  - **Masalah Dropdown Dosen Tidak Muncul:** Dropdown untuk memilih dosen pengampu di halaman edit kelas tidak menampilkan daftar dosen. Masalah ini disebabkan oleh perbandingan `ObjectId` MongoDB dengan string di HTML template. Solusi yang diimplementasikan adalah penggunaan filter `|string` di Jinja2 untuk memastikan `ObjectId` dikonversi menjadi string sebelum dibandingkan.
-  - **Error `BadRequestKeyError: 'nama_kelas'`:** Error ini muncul karena field `nama_kelas` tidak ada di form, sehingga server tidak bisa memproses key tersebut. Setelah menambahkan kembali input `nama_kelas` di template, error teratasi.
-  - **Hasil Akhir:** Fitur edit kelas sekarang memungkinkan perubahan dosen pengampu, nama kelas, dan jadwal kelas dengan benar, dan perubahan tercermin di akun dosen terkait.
+- **4/09/2024**: 
+  - **Perbaikan Fitur Edit Kelas:**
+    - Dropdown dosen pengampu tidak menampilkan daftar dosen di halaman edit kelas. Masalah ini diselesaikan dengan penggunaan filter `|string` di Jinja2 untuk memastikan `ObjectId` dikonversi menjadi string.
+    - `BadRequestKeyError: 'nama_kelas'`: Error terjadi karena field `nama_kelas` tidak ada di form. Setelah ditambahkan kembali di template, masalah teratasi.
+    - Fitur edit kelas sekarang memungkinkan perubahan dosen pengampu, nama kelas, dan jadwal kelas, serta perubahan ini tercermin di akun dosen yang terkait.
+  - **Implementasi Fitur Kelola Mahasiswa:**
+    - **Fitur Kelola Mahasiswa di Kelas:** Mahasiswa dapat ditambahkan atau dihapus dari kelas melalui halaman **kelola_kelas_mahasiswa.html** yang sudah diperbarui dengan tampilan menggunakan tabel Bootstrap.
+    - Setiap kali mahasiswa dihapus dari sistem, jumlah mahasiswa di setiap kelas diperbarui secara otomatis menggunakan `update_many` di MongoDB.
+    - **Solusi Penghapusan Mahasiswa di Sistem:** Jumlah mahasiswa di kelas yang terkait dengan mahasiswa tersebut sekarang diperbarui dengan benar di tabel kelola kelas setelah mahasiswa dihapus dari list mahasiswa.
 
 ## 🎯 Fitur Utama
 - **Pengenalan Wajah:** Penggunaan teknologi pengenalan wajah untuk memastikan kehadiran yang akurat.
