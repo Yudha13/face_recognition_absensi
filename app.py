@@ -1,9 +1,10 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 from pymongo import MongoClient
 from config import MONGO_URI, DB_NAME, SECRET_KEY
 from bson.objectid import ObjectId
 import pandas as pd
 from flask import send_file
+from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
@@ -57,7 +58,7 @@ def admin_dashboard():
 @app.route('/admin/kelola_mahasiswa', methods=['GET', 'POST'])
 def kelola_mahasiswa():
     if 'admin_logged_in' in session:
-        mahasiswa = db.mahasiswa.find()
+        mahasiswa = list(db.mahasiswa.find())  # Ubah menjadi list
         return render_template('admin/mahasiswa/kelola_mahasiswa.html', mahasiswa=mahasiswa)
     else:
         return redirect(url_for('admin_login'))
@@ -106,7 +107,7 @@ def edit_mahasiswa(id):
         return redirect(url_for('admin_login'))
 
 # Hapus Mahasiswa
-@app.route('/admin/hapus_mahasiswa/<id>', methods=['POST'])
+@app.route('/admin/hapus_mahasiswa/<id>', methods=['GET', 'POST'])
 def hapus_mahasiswa(id):
     if 'admin_logged_in' in session:
         # Hapus mahasiswa dari koleksi mahasiswa
@@ -114,7 +115,7 @@ def hapus_mahasiswa(id):
 
         # Perbarui semua kelas yang memiliki mahasiswa ini
         db.kelas.update_many({}, {"$pull": {"mahasiswa": ObjectId(id)}})
-
+        flash('Mahasiswa berhasil dihapus.', 'success')  # Pesan flash
         return redirect(url_for('kelola_mahasiswa'))
     else:
         return redirect(url_for('admin_login'))
@@ -123,7 +124,7 @@ def hapus_mahasiswa(id):
 @app.route('/admin/kelola_dosen', methods=['GET', 'POST'])
 def kelola_dosen():
     if 'admin_logged_in' in session:
-        dosen = db.dosen.find()
+        dosen = list(db.dosen.find())  # Ubah menjadi list
         return render_template('admin/dosen/kelola_dosen.html', dosen=dosen)
     else:
         return redirect(url_for('admin_login'))
@@ -176,10 +177,11 @@ def edit_dosen(id):
         return redirect(url_for('admin_login'))
 
 # Hapus Dosen
-@app.route('/admin/hapus_dosen/<id>', methods=['POST'])
+@app.route('/admin/hapus_dosen/<id>', methods=['GET', 'POST'])
 def hapus_dosen(id):
     if 'admin_logged_in' in session:
         db.dosen.delete_one({"_id": ObjectId(id)})
+        flash('Dosen berhasil dihapus.', 'success')  # Pesan flash
         return redirect(url_for('kelola_dosen'))
     else:
         return redirect(url_for('admin_login'))
@@ -188,6 +190,7 @@ def hapus_dosen(id):
 @app.route('/admin/kelola_kelas', methods=['GET', 'POST'])
 def kelola_kelas():
     if 'admin_logged_in' in session:
+        # Gunakan lookup untuk mengambil data dosen dengan left join
         kelas_list = db.kelas.aggregate([
             {
                 '$lookup': {
@@ -198,10 +201,21 @@ def kelola_kelas():
                 }
             },
             {
-                '$unwind': '$dosen'
+                '$unwind': {
+                    'path': '$dosen',
+                    'preserveNullAndEmptyArrays': True  # Ini memastikan bahwa kelas tetap muncul meskipun dosen tidak ditemukan
+                }
             }
         ])
-        return render_template('admin/kelas/kelola_kelas.html', kelas_list=kelas_list)
+
+        # Membuat jadwal kelas sebagai gabungan hari, jam mulai, dan jam selesai
+        kelas_data = []
+        for kelas in kelas_list:
+            jadwal_kelas = f"{kelas['hari']} {kelas['jam_mulai']} - {kelas['jam_selesai']}"
+            kelas['jadwal_kelas'] = jadwal_kelas
+            kelas_data.append(kelas)
+
+        return render_template('admin/kelas/kelola_kelas.html', kelas_list=kelas_data)
     else:
         return redirect(url_for('admin_login'))
 
@@ -212,20 +226,35 @@ def tambah_kelas():
         if request.method == 'POST':
             nama_kelas = request.form['nama_kelas']
             dosen_pengampu = ObjectId(request.form['dosen_pengampu'])
-            jadwal_kelas = request.form['jadwal_kelas']
-            mahasiswa = [ObjectId(mhs_id) for mhs_id in request.form.getlist('mahasiswa[]')]
-            
+            hari = request.form['hari']
+            jam_mulai_jam = request.form['jam_mulai_jam']
+            jam_mulai_menit = request.form['jam_mulai_menit']
+            jam_selesai_jam = request.form['jam_selesai_jam']
+            jam_selesai_menit = request.form['jam_selesai_menit']
+
+            # Gabungkan jam dan menit
+            jam_mulai = f"{jam_mulai_jam}:{jam_mulai_menit}"
+            jam_selesai = f"{jam_selesai_jam}:{jam_selesai_menit}"
+
+            # Cek apakah ada kelas lain yang jadwalnya bertabrakan
+            if cek_jadwal_bentrok(hari, jam_mulai, jam_selesai):
+                # Jika ada jadwal bertabrakan, kembalikan pesan error
+                flash('Jadwal kelas bertabrakan dengan kelas lain. Silakan pilih jadwal lain.', 'danger')
+                return redirect(url_for('tambah_kelas'))
+
+            # Simpan kelas jika tidak ada bentrok
             db.kelas.insert_one({
                 "nama_kelas": nama_kelas,
                 "dosen_pengampu": dosen_pengampu,
-                "jadwal_kelas": jadwal_kelas,
-                "mahasiswa": mahasiswa
+                "hari": hari,
+                "jam_mulai": jam_mulai,
+                "jam_selesai": jam_selesai,
+                "mahasiswa": []
             })
             return redirect(url_for('kelola_kelas'))
-        
+
         daftar_dosen = db.dosen.find()
-        daftar_mahasiswa = db.mahasiswa.find()
-        return render_template('admin/kelas/tambah_kelas.html', daftar_dosen=daftar_dosen, daftar_mahasiswa=daftar_mahasiswa)
+        return render_template('admin/kelas/tambah_kelas.html', daftar_dosen=daftar_dosen)
     else:
         return redirect(url_for('admin_login'))
 
@@ -235,43 +264,86 @@ def edit_kelas(id):
     if 'admin_logged_in' in session:
         # Ambil data kelas berdasarkan ID
         kelas = db.kelas.find_one({"_id": ObjectId(id)})
-        
+
+        # Lookup untuk mendapatkan data dosen berdasarkan dosen_pengampu
+        if kelas:
+            dosen_pengampu = db.dosen.find_one({"_id": kelas['dosen_pengampu']})
+            kelas['dosen'] = dosen_pengampu  # Tambahkan data dosen ke dalam object kelas
+
+        if request.method == 'POST':
+            # Proses pengeditan data kelas
+            # ...
+            pass
+
         if request.method == 'POST':
             # Ambil data dari form yang diinputkan user
             nama_kelas = request.form['nama_kelas']
-            dosen_pengampu = request.form['dosen_pengampu']
-            jadwal_kelas = request.form['jadwal_kelas']
+            dosen_pengampu = ObjectId(request.form['dosen_pengampu'])
+            hari = request.form['hari']
+            jam_mulai_jam = request.form['jam_mulai_jam']
+            jam_mulai_menit = request.form['jam_mulai_menit']
+            jam_selesai_jam = request.form['jam_selesai_jam']
+            jam_selesai_menit = request.form['jam_selesai_menit']
 
-            # Periksa apakah dosen_pengampu valid sebelum mengubah menjadi ObjectId
-            if dosen_pengampu:
-                dosen_pengampu = ObjectId(dosen_pengampu)
+            # Gabungkan jam dan menit
+            jam_mulai = f"{jam_mulai_jam}:{jam_mulai_menit}"
+            jam_selesai = f"{jam_selesai_jam}:{jam_selesai_menit}"
 
-            # Update data kelas di database
+            # Cek apakah jadwal bentrok dengan kelas lain, kecuali kelas yang sedang diedit
+            if cek_jadwal_bentrok(hari, jam_mulai, jam_selesai, kelas_id=ObjectId(id)):
+                flash('Jadwal kelas bertabrakan dengan kelas lain. Silakan pilih jadwal lain.', 'danger')
+                return redirect(url_for('edit_kelas', id=id))
+
+            # Update data kelas di MongoDB
             db.kelas.update_one({"_id": ObjectId(id)}, {
                 "$set": {
                     "nama_kelas": nama_kelas,
                     "dosen_pengampu": dosen_pengampu,
-                    "jadwal_kelas": jadwal_kelas
+                    "hari": hari,
+                    "jam_mulai": jam_mulai,
+                    "jam_selesai": jam_selesai
                 }
             })
             return redirect(url_for('kelola_kelas'))
 
         # Ambil daftar dosen untuk dropdown list di menu
-        daftar_dosen = list(db.dosen.find())  # Mengonversi cursor ke list
-
-        # Debugging untuk memastikan daftar dosen diambil dengan benar
-        print(f"Debug: Daftar Dosen - {daftar_dosen}")
-        print(f"Debug: Kelas - {kelas}")
-
+        daftar_dosen = list(db.dosen.find())
         return render_template('admin/kelas/edit_kelas.html', kelas=kelas, daftar_dosen=daftar_dosen)
     else:
         return redirect(url_for('admin_login'))
 
+# Fungsi untuk memeriksa bentrokan jadwal
+def cek_jadwal_bentrok(hari, jam_mulai_baru, jam_selesai_baru, kelas_id=None):
+    # Cari semua kelas yang ada di hari yang sama
+    kelas_di_hari = db.kelas.find({"hari": hari})
+
+    # Konversi waktu dari string ke format datetime
+    jam_mulai_baru = datetime.strptime(jam_mulai_baru, '%H:%M')
+    jam_selesai_baru = datetime.strptime(jam_selesai_baru, '%H:%M')
+
+    for kelas in kelas_di_hari:
+        if kelas_id and kelas['_id'] == kelas_id:
+            continue  # Abaikan jika itu adalah kelas yang sedang diedit
+
+        jam_mulai_ada = datetime.strptime(kelas['jam_mulai'], '%H:%M')
+        jam_selesai_ada = datetime.strptime(kelas['jam_selesai'], '%H:%M')
+
+        # Cek apakah ada tumpang tindih:
+        if (jam_mulai_baru < jam_selesai_ada and jam_selesai_baru > jam_mulai_ada):
+            return True  # Bentrok jadwal ditemukan
+    return False  # Tidak ada bentrok
+
 # Hapus Kelas
-@app.route('/admin/hapus_kelas/<id>', methods=['POST'])
+@app.route('/admin/hapus_kelas/<id>', methods=['POST', 'GET'])
 def hapus_kelas(id):
     if 'admin_logged_in' in session:
+        # Hapus kelas berdasarkan ID
         db.kelas.delete_one({"_id": ObjectId(id)})
+
+        # Kirim pesan flash untuk konfirmasi penghapusan
+        flash('Kelas berhasil dihapus.', 'success')
+
+        # Redirect kembali ke halaman kelola kelas
         return redirect(url_for('kelola_kelas'))
     else:
         return redirect(url_for('admin_login'))
@@ -476,4 +548,5 @@ def dosen_unduh_absensi():
 # sudah di ujung aspal
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000)
+    #app.run(debug=True)

@@ -6,6 +6,9 @@
     <title>Kelola Kelas</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/dist/css/adminlte.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/fontawesome-free/css/all.min.css') }}">
+
+    <!-- SweetAlert2 CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
 </head>
 <body class="hold-transition sidebar-mini layout-fixed">
     <div class="wrapper">
@@ -29,54 +32,49 @@
                 </div>
             </section>
 
-            <!-- Main Content -->
+            <!-- Main content -->
             <section class="content">
                 <div class="container-fluid">
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title">Daftar Kelas</h3>
+                            <a href="{{ url_for('tambah_kelas') }}" class="btn btn-primary float-right">Tambah Kelas</a>
                         </div>
 
-                        <!-- Card Body -->
+                        <!-- Table displaying kelas data, make the table responsive -->
                         <div class="card-body">
-                            <table class="table table-bordered table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Nama Kelas</th>
-                                        <th>Dosen Pengampu</th>
-                                        <th>Jadwal Kelas</th>
-                                        <th>Jumlah Mahasiswa</th>
-                                        <th>Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for kelas in kelas_list %}
-                                    <tr>
-                                        <td>{{ kelas.nama_kelas }}</td>
-                                        <td>{{ kelas.dosen.nama }}</td>
-                                        <td>{{ kelas.jadwal_kelas }}</td>
-                                        <td>{{ kelas.mahasiswa | length }} Mahasiswa</td> <!-- Menghitung jumlah mahasiswa di kelas -->
-                                        <td>
-                                            <!-- Tombol Edit -->
-                                            <a href="{{ url_for('edit_kelas', id=kelas._id) }}" class="btn btn-warning btn-sm">Edit</a>
-                                            
-                                            <!-- Tombol Hapus -->
-                                            <form action="{{ url_for('hapus_kelas', id=kelas._id) }}" method="post" style="display:inline;">
-                                                <button type="submit" class="btn btn-danger btn-sm">Hapus</button>
-                                            </form>
+                            <div class="table-responsive">
+                                <table id="kelasTable" class="table table-bordered table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>No</th>
+                                            <th>Nama Kelas</th>
+                                            <th>Dosen Pengampu</th>
+                                            <th>Jadwal Kelas</th>
+                                            <th>Jumlah Mahasiswa</th>
+                                            <th>Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for kelas in kelas_list %}
+                                        <tr>
+                                            <td>{{ loop.index }}</td>
+                                            <td>{{ kelas.nama_kelas }}</td>
+                                            <td>{% if kelas.dosen %}{{ kelas.dosen.nama }}{% else %}Tidak Ada Dosen{% endif %}</td>
+                                            <td>{{ kelas.jadwal_kelas }}</td>
+                                            <td>{{ kelas.mahasiswa | length }}</td>
+                                            <td>
+                                                <a href="{{ url_for('edit_kelas', id=kelas._id) }}" class="btn btn-warning btn-sm">Edit</a>
+                                                <button class="btn btn-danger btn-sm" onclick="confirmDelete('{{ url_for('hapus_kelas', id=kelas._id) | safe }}')">Hapus</button>
 
-                                            <!-- Tombol Kelola Mahasiswa -->
-                                            <a href="{{ url_for('kelola_kelas_mahasiswa', id=kelas._id) }}" class="btn btn-sm btn-warning">Kelola Mahasiswa</a>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <!-- Card Footer -->
-                        <div class="card-footer">
-                            <a href="{{ url_for('tambah_kelas') }}" class="btn btn-primary">Tambah Kelas Baru</a>
+                                                <!-- Tambahan tombol Kelola Mahasiswa -->
+                                                <a href="{{ url_for('kelola_kelas_mahasiswa', id=kelas._id) }}" class="btn btn-info btn-sm">Kelola Mahasiswa</a>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -85,11 +83,60 @@
 
         <!-- Footer -->
         {% include 'admin/footer.html' %}
+
     </div>
+
+    <!-- SweetAlert2 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <!-- SweetAlert2 Konfirmasi Penghapusan -->
+    <script>
+        function confirmDelete(deleteUrl) {
+            Swal.fire({
+                title: 'Anda yakin ingin menghapus kelas ini?',
+                text: "Tindakan ini tidak dapat dibatalkan!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Ya, hapus!',
+                cancelButtonText: 'Tidak'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Redirect ke URL penghapusan kelas jika pengguna memilih "Ya"
+                    window.location.href = deleteUrl;
+                }
+            })
+        }
+    </script>
+
+    <!-- SweetAlert2 untuk Pesan Flash -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <script>
+                Swal.fire({
+                    icon: '{% if messages[0][0] == "success" %}success{% else %}error{% endif %}',
+                    title: 'Pemberitahuan',
+                    text: '{{ messages[0][1] }}'
+                });
+            </script>
+        {% endif %}
+    {% endwith %}
 
     <!-- Scripts -->
     <script src="{{ url_for('static', filename='admin_lte/plugins/jquery/jquery.min.js') }}"></script>
     <script src="{{ url_for('static', filename='admin_lte/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin_lte/plugins/datatables/jquery.dataTables.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin_lte/plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
     <script src="{{ url_for('static', filename='admin_lte/dist/js/adminlte.min.js') }}"></script>
+
+    <script>
+        $(function () {
+            $("#kelasTable").DataTable({
+                "responsive": true,
+                "autoWidth": false,
+            });
+        });
+    </script>
 </body>
 </html>

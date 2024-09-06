@@ -1,12 +1,14 @@
-<!-- templates/admin/mahasiswa/kelola_mahasiswa.html -->
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kelola Mahasiswa</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/dist/css/adminlte.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/fontawesome-free/css/all.min.css') }}">
+
+    <!-- SweetAlert2 CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
 </head>
 <body class="hold-transition sidebar-mini layout-fixed">
     <div class="wrapper">
@@ -14,7 +16,7 @@
         <!-- Navbar -->
         {% include 'admin/navbar.html' %}
 
-        <!-- Main Sidebar Container -->
+        <!-- Sidebar -->
         {% include 'admin/sidebar.html' %}
 
         <!-- Content Wrapper -->
@@ -33,45 +35,45 @@
             <!-- Main content -->
             <section class="content">
                 <div class="container-fluid">
-                    <!-- Tombol Tambah Mahasiswa -->
-                    <a href="{{ url_for('tambah_mahasiswa') }}" class="btn btn-primary mb-3">Tambah Mahasiswa</a>
-
-                    <!-- Tabel Daftar Mahasiswa -->
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title">Daftar Mahasiswa</h3>
+                            <a href="{{ url_for('tambah_mahasiswa') }}" class="btn btn-primary float-right">Tambah Mahasiswa</a>
                         </div>
+
+                        <!-- Table displaying mahasiswa data, make the table responsive -->
                         <div class="card-body">
-                            <table class="table table-bordered">
-                                <thead>
-                                    <tr>
-                                        <th>NIM</th>
-                                        <th>Nama</th>
-                                        <th>Email</th>
-                                        <th>Nomor HP</th>
-                                        <th>Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for mhs in mahasiswa %}
-                                    <tr>
-                                        <td>{{ mhs.nim }}</td>
-                                        <td>{{ mhs.nama }}</td>
-                                        <td>{{ mhs.email }}</td>
-                                        <td>{{ mhs.nomor_hp }}</td>
-                                        <td>
-                                            <!-- Tombol Edit -->
-                                            <a href="{{ url_for('edit_mahasiswa', id=mhs._id) }}" class="btn btn-warning btn-sm">Edit</a>
-                                            
-                                            <!-- Tombol Hapus -->
-                                            <form action="{{ url_for('hapus_mahasiswa', id=mhs._id) }}" method="post" style="display:inline;">
-                                                <button type="submit" class="btn btn-danger btn-sm">Hapus</button>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+                            <div class="table-responsive">
+                                <table id="mahasiswaTable" class="table table-bordered table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>No</th>
+                                            <th>NIM</th>
+                                            <th>Nama</th>
+                                            <th>Email</th>
+                                            <th>Nomor HP</th>
+                                            <th>Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for mahasiswa in mahasiswa %}
+                                        <tr>
+                                            <td>{{ loop.index }}</td>
+                                            <td>{{ mahasiswa.nim }}</td>
+                                            <td>{{ mahasiswa.nama }}</td>
+                                            <td>{{ mahasiswa.email }}</td>
+                                            <td>{{ mahasiswa.nomor_hp }}</td>
+                                            <td>
+                                                <a href="{{ url_for('edit_mahasiswa', id=mahasiswa._id) }}" class="btn btn-warning btn-sm">Edit</a>
+
+                                                <!-- Tombol Hapus dengan SweetAlert2 -->
+                                                <button class="btn btn-danger btn-sm" onclick="confirmDelete('{{ url_for('hapus_mahasiswa', id=mahasiswa._id) | safe }}')">Hapus</button>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -80,11 +82,60 @@
 
         <!-- Footer -->
         {% include 'admin/footer.html' %}
+
     </div>
 
-    <!-- Script JS AdminLTE -->
+    <!-- SweetAlert2 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <!-- SweetAlert2 Konfirmasi Penghapusan -->
+    <script>
+        function confirmDelete(deleteUrl) {
+            Swal.fire({
+                title: 'Anda yakin ingin menghapus mahasiswa ini?',
+                text: "Tindakan ini tidak dapat dibatalkan!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Ya, hapus!',
+                cancelButtonText: 'Tidak'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Redirect ke URL penghapusan mahasiswa jika pengguna memilih "Ya"
+                    window.location.href = deleteUrl;
+                }
+            })
+        }
+    </script>
+
+    <!-- SweetAlert2 untuk Pesan Flash -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <script>
+                Swal.fire({
+                    icon: '{% if messages[0][0] == "success" %}success{% else %}error{% endif %}',
+                    title: 'Pemberitahuan',
+                    text: '{{ messages[0][1] }}'
+                });
+            </script>
+        {% endif %}
+    {% endwith %}
+
+    <!-- Scripts -->
     <script src="{{ url_for('static', filename='admin_lte/plugins/jquery/jquery.min.js') }}"></script>
     <script src="{{ url_for('static', filename='admin_lte/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin_lte/plugins/datatables/jquery.dataTables.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin_lte/plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
     <script src="{{ url_for('static', filename='admin_lte/dist/js/adminlte.min.js') }}"></script>
+
+    <script>
+        $(function () {
+            $("#mahasiswaTable").DataTable({
+                "responsive": true,
+                "autoWidth": false,
+            });
+        });
+    </script>
 </body>
 </html>

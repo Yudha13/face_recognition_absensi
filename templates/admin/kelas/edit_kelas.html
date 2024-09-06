@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,6 +16,16 @@
         <!-- Sidebar -->
         {% include 'admin/sidebar.html' %}
 
+        <!-- Pesan Flash -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="alert alert-{{ messages[0][0] }}">
+                    {{ messages[0][1] }}
+                </div>
+            {% endif %}
+        {% endwith %}
+    
+
         <!-- Content Wrapper -->
         <div class="content-wrapper">
             <!-- Content Header -->
@@ -28,37 +38,82 @@
                     </div>
                 </div>
             </section>
-            
+
             <!-- Main Content -->
             <section class="content">
                 <div class="container-fluid">
-                    <form action="{{ url_for('edit_kelas', id=kelas._id) }}" method="POST">
-                        <div class="form-group">
-                            <label for="nama_kelas">Nama Kelas</label>
-                            <input type="text" class="form-control" id="nama_kelas" name="nama_kelas" value="{{ kelas.nama_kelas }}" required>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Form Edit Kelas</h3>
                         </div>
-                    
-                        <div class="form-group">
-                            <label for="dosen_pengampu">Dosen Pengampu</label>
-                            <select class="form-control" id="dosen_pengampu" name="dosen_pengampu" required>
-                                <option value="">Pilih Dosen</option>
-                                {% for dosen in daftar_dosen %}
-                                <option value="{{ dosen._id }}" 
-                                    {% if kelas.dosen_pengampu|string == dosen._id|string %}selected{% endif %}>
-                                    {{ dosen.nama }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
+
+                        <!-- Form Start -->
+                        <form action="{{ url_for('edit_kelas', id=kelas._id) }}" method="POST">
+                            <div class="form-group">
+                                <label for="nama_kelas">Nama Kelas</label>
+                                <input type="text" class="form-control" id="nama_kelas" name="nama_kelas" value="{{ kelas.nama_kelas }}" required>
+                            </div>
                         
-                        <div class="form-group">
-                            <label for="jadwal_kelas">Jadwal Kelas</label>
-                            <input type="text" class="form-control" id="jadwal_kelas" name="jadwal_kelas" value="{{ kelas.jadwal_kelas }}" required>
+                            <div class="form-group">
+                                <label for="dosen_pengampu">Dosen Pengampu</label>
+                                <select class="form-control" id="dosen_pengampu" name="dosen_pengampu" required>
+                                    <option value="">Pilih Dosen</option>
+                                    {% for dosen in daftar_dosen %}
+                                    <option value="{{ dosen._id }}" {% if dosen._id == kelas.dosen._id %} selected {% endif %}>{{ dosen.nama }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        
+                            <div class="form-group">
+                                <label for="hari">Hari</label>
+                                <select id="hari" name="hari" class="form-control" required>
+                                    <option value="Senin" {% if kelas.hari == "Senin" %} selected {% endif %}>Senin</option>
+                                    <option value="Selasa" {% if kelas.hari == "Selasa" %} selected {% endif %}>Selasa</option>
+                                    <option value="Rabu" {% if kelas.hari == "Rabu" %} selected {% endif %}>Rabu</option>
+                                    <option value="Kamis" {% if kelas.hari == "Kamis" %} selected {% endif %}>Kamis</option>
+                                    <option value="Jumat" {% if kelas.hari == "Jumat" %} selected {% endif %}>Jumat</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="jam_mulai">Jam Mulai</label>
+                                <select id="jam_mulai_jam" name="jam_mulai_jam" class="form-control" required>
+                                    {% for i in range(24) %}
+                                    <option value="{{ '{:02d}'.format(i) }}" {% if kelas.jam_mulai.split(':')[0] == '{:02d}'.format(i) %} selected {% endif %}>{{ '{:02d}'.format(i) }}</option>
+                                    {% endfor %}
+                                </select> :
+                                <select id="jam_mulai_menit" name="jam_mulai_menit" class="form-control" required>
+                                    {% for i in range(60) %}
+                                    <option value="{{ '{:02d}'.format(i) }}" {% if kelas.jam_mulai.split(':')[1] == '{:02d}'.format(i) %} selected {% endif %}>{{ '{:02d}'.format(i) }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="jam_selesai">Jam Selesai</label>
+                                <select id="jam_selesai_jam" name="jam_selesai_jam" class="form-control" required>
+                                    {% for i in range(24) %}
+                                    <option value="{{ '{:02d}'.format(i) }}" {% if kelas.jam_selesai.split(':')[0] == '{:02d}'.format(i) %} selected {% endif %}>{{ '{:02d}'.format(i) }}</option>
+                                    {% endfor %}
+                                </select> :
+                                <select id="jam_selesai_menit" name="jam_selesai_menit" class="form-control" required>
+                                    {% for i in range(60) %}
+                                    <option value="{{ '{:02d}'.format(i) }}" {% if kelas.jam_selesai.split(':')[1] == '{:02d}'.format(i) %} selected {% endif %}>{{ '{:02d}'.format(i) }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        
+                            <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+                        </form>
+
+                        <!-- Card Footer -->
+                        <div class="card-footer">
+                            <a href="{{ url_for('kelola_kelas') }}" class="btn btn-secondary">Kembali</a>
                         </div>
-                    
-                        <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
-                    </form>
-                    
+                    </div>
+                </div>
+            </section>
+        </div>
 
         <!-- Footer -->
         {% include 'admin/footer.html' %}

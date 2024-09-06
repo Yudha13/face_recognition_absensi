@@ -1,4 +1,3 @@
-
 # Absensi Face Recognition
 
 ## 📜 Deskripsi Proyek
@@ -19,6 +18,16 @@ Proyek ini adalah sistem absensi berbasis pengenalan wajah yang dibangun menggun
     - **Fitur Kelola Mahasiswa di Kelas:** Mahasiswa dapat ditambahkan atau dihapus dari kelas melalui halaman **kelola_kelas_mahasiswa.html** yang sudah diperbarui dengan tampilan menggunakan tabel Bootstrap.
     - Setiap kali mahasiswa dihapus dari sistem, jumlah mahasiswa di setiap kelas diperbarui secara otomatis menggunakan `update_many` di MongoDB.
     - **Solusi Penghapusan Mahasiswa di Sistem:** Jumlah mahasiswa di kelas yang terkait dengan mahasiswa tersebut sekarang diperbarui dengan benar di tabel kelola kelas setelah mahasiswa dihapus dari list mahasiswa.
+
+- **6/09/2024**:
+  - **Perbaikan pada Kelola Kelas, Dosen, dan Mahasiswa**:
+    - Pengelolaan kelas, dosen, dan mahasiswa oleh admin telah disempurnakan. Tombol "Kelola Mahasiswa" ditambahkan pada setiap kelas untuk mengelola mahasiswa di kelas terkait.
+    - Penggunaan **SweetAlert2** untuk konfirmasi penghapusan data telah diterapkan pada semua fitur pengelolaan.
+    - Semua tabel di halaman admin telah dibuat responsif dengan **DataTables** yang mendukung fitur pencarian dan pagination.
+  - **Pengembangan Selanjutnya**:
+    - Penambahan fitur training foto tiap mahasiswa untuk integrasi dengan **face recognition**.
+    - Halaman **Rekap Absensi** akan diperbarui untuk menampilkan data absensi tiap kelas, termasuk unduhan laporan absensi dalam format Excel.
+    - Perbaikan halaman dosen agar dosen dapat mengakses daftar mahasiswa terkait dan rekap absensi dengan lebih mudah.
 
 ## 🎯 Fitur Utama
 - **Pengenalan Wajah:** Penggunaan teknologi pengenalan wajah untuk memastikan kehadiran yang akurat.
