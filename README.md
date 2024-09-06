@@ -1,7 +1,7 @@
 # Absensi Face Recognition
 
-## 📜 Deskripsi Proyek
-Proyek ini adalah sistem absensi berbasis pengenalan wajah yang dibangun menggunakan Flask, MongoDB, dan Raspberry Pi. Sistem ini memungkinkan admin untuk mengelola data dosen, mahasiswa, kelas, serta laporan absensi dengan mudah.
+## 📜 Deskripsi Project
+Project ini adalah sistem absensi berbasis pengenalan wajah yang dibangun menggunakan Flask, MongoDB, dan Raspberry Pi. Sistem ini memungkinkan admin untuk mengelola data dosen, mahasiswa, kelas, serta laporan absensi dengan mudah.
 
 **Catatan:** Sistem ini masih dalam tahap pengembangan dan belum sepenuhnya selesai.
 
