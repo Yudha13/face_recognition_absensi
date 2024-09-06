@@ -24,10 +24,13 @@ Project ini adalah sistem absensi berbasis pengenalan wajah yang dibangun menggu
     - Pengelolaan kelas, dosen, dan mahasiswa oleh admin telah disempurnakan. Tombol "Kelola Mahasiswa" ditambahkan pada setiap kelas untuk mengelola mahasiswa di kelas terkait.
     - Penggunaan **SweetAlert2** untuk konfirmasi penghapusan data telah diterapkan pada semua fitur pengelolaan.
     - Semua tabel di halaman admin telah dibuat responsif dengan **DataTables** yang mendukung fitur pencarian dan pagination.
+    -Penyimpanan Jadwal dalam Bentuk Date: Jadwal kelas sekarang disimpan dalam bentuk date di database.
+    -Pencegahan Bentrokan Jadwal: Fitur validasi jadwal telah ditambahkan untuk mencegah kelas memiliki jadwal yang bertabrakan dengan kelas lain.
   - **Pengembangan Selanjutnya**:
     - Penambahan fitur training foto tiap mahasiswa untuk integrasi dengan **face recognition**.
     - Halaman **Rekap Absensi** akan diperbarui untuk menampilkan data absensi tiap kelas, termasuk unduhan laporan absensi dalam format Excel.
     - Perbaikan halaman dosen agar dosen dapat mengakses daftar mahasiswa terkait dan rekap absensi dengan lebih mudah.
+    
 
 ## 🎯 Fitur Utama
 - **Pengenalan Wajah:** Penggunaan teknologi pengenalan wajah untuk memastikan kehadiran yang akurat.
