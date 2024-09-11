@@ -6,8 +6,6 @@
     <title>Kelola Kelas</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/dist/css/adminlte.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/fontawesome-free/css/all.min.css') }}">
-
-    <!-- SweetAlert2 CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
 </head>
 <body class="hold-transition sidebar-mini layout-fixed">
@@ -66,9 +64,14 @@
                                             <td>
                                                 <a href="{{ url_for('edit_kelas', id=kelas._id) }}" class="btn btn-warning btn-sm">Edit</a>
                                                 <button class="btn btn-danger btn-sm" onclick="confirmDelete('{{ url_for('hapus_kelas', id=kelas._id) | safe }}')">Hapus</button>
-
-                                                <!-- Tambahan tombol Kelola Mahasiswa -->
+                                                
+                                                <!-- Tombol Kelola Mahasiswa -->
                                                 <a href="{{ url_for('kelola_kelas_mahasiswa', id=kelas._id) }}" class="btn btn-info btn-sm">Kelola Mahasiswa</a>
+                                                
+                                                <!-- Tombol Mulai Kelas dengan Form POST -->
+                                                <form action="{{ url_for('start_kelas', kelas_id=kelas._id) }}" method="POST" style="display:inline;">
+                                                    <button type="submit" class="btn btn-success btn-sm">Mulai Kelas</button>
+                                                </form>
                                             </td>
                                         </tr>
                                         {% endfor %}
@@ -83,7 +86,6 @@
 
         <!-- Footer -->
         {% include 'admin/footer.html' %}
-
     </div>
 
     <!-- SweetAlert2 JS -->
@@ -103,10 +105,27 @@
                 cancelButtonText: 'Tidak'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    // Redirect ke URL penghapusan kelas jika pengguna memilih "Ya"
                     window.location.href = deleteUrl;
                 }
-            })
+            });
+        }
+
+        // SweetAlert2 untuk memulai kelas
+        function startClass(startUrl) {
+            Swal.fire({
+                title: 'Mulai Kelas',
+                text: "Anda akan memulai absensi kelas ini. Lanjutkan?",
+                icon: 'info',
+                showCancelButton: true,
+                confirmButtonColor: '#28a745',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Mulai',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.location.href = startUrl;  // Arahkan ke route mulai kelas
+                }
+            });
         }
     </script>
 
@@ -117,7 +136,9 @@
                 Swal.fire({
                     icon: '{% if messages[0][0] == "success" %}success{% else %}error{% endif %}',
                     title: 'Pemberitahuan',
-                    text: '{{ messages[0][1] }}'
+                    text: '{{ messages[0][1] }}',
+                    timer: 3000,
+                    showConfirmButton: false
                 });
             </script>
         {% endif %}

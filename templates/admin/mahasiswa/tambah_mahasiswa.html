@@ -1,4 +1,3 @@
-<!-- templates/admin/mahasiswa/tambah_mahasiswa.html -->
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -38,7 +37,7 @@
                             <h3 class="card-title">Formulir Tambah Mahasiswa</h3>
                         </div>
                         <!-- Form Start -->
-                        <form action="{{ url_for('tambah_mahasiswa') }}" method="POST">
+                        <form action="{{ url_for('tambah_mahasiswa') }}" method="POST" enctype="multipart/form-data">
                             <div class="card-body">
                                 <div class="form-group">
                                     <label for="nim">NIM</label>
@@ -55,6 +54,16 @@
                                 <div class="form-group">
                                     <label for="nomor_hp">Nomor HP</label>
                                     <input type="text" name="nomor_hp" class="form-control" id="nomor_hp" placeholder="Masukkan Nomor HP" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="foto_mahasiswa">Unggah Foto Mahasiswa (minimal 5 foto, tidak wajib)</label>
+                                    <div class="input-group">
+                                        <input type="file" class="form-control" id="foto_mahasiswa" name="foto_mahasiswa[]" multiple>
+                                        <div class="input-group-append">
+                                            <button type="submit" class="btn btn-primary">Upload</button>
+                                        </div>
+                                    </div>
+                                    <small class="form-text text-muted">Unggah minimal 5 foto untuk training face recognition.</small>
                                 </div>
                             </div>
                             <!-- /.card-body -->

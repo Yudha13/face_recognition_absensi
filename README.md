@@ -26,11 +26,19 @@ Project ini adalah sistem absensi berbasis pengenalan wajah yang dibangun menggu
     - Semua tabel di halaman admin telah dibuat responsif dengan **DataTables** yang mendukung fitur pencarian dan pagination.
     -Penyimpanan Jadwal dalam Bentuk Date: Jadwal kelas sekarang disimpan dalam bentuk date di database.
     -Pencegahan Bentrokan Jadwal: Fitur validasi jadwal telah ditambahkan untuk mencegah kelas memiliki jadwal yang bertabrakan dengan kelas lain.
-  - **Pengembangan Selanjutnya**:
-    - Penambahan fitur training foto tiap mahasiswa untuk integrasi dengan **face recognition**.
-    - Halaman **Rekap Absensi** akan diperbarui untuk menampilkan data absensi tiap kelas, termasuk unduhan laporan absensi dalam format Excel.
-    - Perbaikan halaman dosen agar dosen dapat mengakses daftar mahasiswa terkait dan rekap absensi dengan lebih mudah.
-    
+
+- **7/09/2024**:
+  - **Training Foto Mahasiswa dan Absensi:**
+    - Implementasi fitur training foto mahasiswa berhasil dilakukan. Model hasil training disimpan di direktori `models/NIM_mahasiswa/`.
+    - Integrasi **Local Binary Pattern (LBP)** untuk deteksi wajah dan pengenalan wajah berjalan dengan baik.
+    - Proses training mahasiswa ditampilkan di dashboard admin secara real-time menggunakan AJAX polling.
+  - **Pengenalan Wajah untuk Absensi:**
+    - Absensi dapat dimulai secara manual oleh admin melalui tombol "Mulai Kelas" pada halaman kelola kelas.
+    - **Proses Absensi Real-Time:** Status absensi ditampilkan di dashboard dengan informasi mengenai kelas yang sedang berlangsung.
+    - Fitur **Stop Kelas** untuk menghentikan proses absensi juga telah ditambahkan ke dashboard admin.
+  - **Masalah yang Masih Ada:**
+    - Pengenalan wajah untuk beberapa mahasiswa kurang akurat, terutama dalam pencatatan NIM dan confidence level.
+    - Perbaikan visualisasi informasi pada window kamera masih diperlukan untuk menampilkan data absensi dan wajah dengan lebih jelas.
 
 ## 🎯 Fitur Utama
 - **Pengenalan Wajah:** Penggunaan teknologi pengenalan wajah untuk memastikan kehadiran yang akurat.

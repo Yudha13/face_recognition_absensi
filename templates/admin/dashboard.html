@@ -1,4 +1,3 @@
-<!-- templates/admin/dashboard.html -->
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -35,8 +34,8 @@
             <section class="content">
                 <div class="container-fluid">
                     <div class="row">
+                        <!-- Box Mahasiswa -->
                         <div class="col-lg-3 col-6">
-                            <!-- small box -->
                             <div class="small-box bg-info">
                                 <div class="inner">
                                     <h3>{{ jumlah_mahasiswa }}</h3>
@@ -48,8 +47,9 @@
                                 <a href="{{ url_for('kelola_mahasiswa') }}" class="small-box-footer">Info lebih lanjut <i class="fas fa-arrow-circle-right"></i></a>
                             </div>
                         </div>
+
+                        <!-- Box Dosen -->
                         <div class="col-lg-3 col-6">
-                            <!-- small box -->
                             <div class="small-box bg-success">
                                 <div class="inner">
                                     <h3>{{ jumlah_dosen }}</h3>
@@ -61,8 +61,9 @@
                                 <a href="{{ url_for('kelola_dosen') }}" class="small-box-footer">Info lebih lanjut <i class="fas fa-arrow-circle-right"></i></a>
                             </div>
                         </div>
+
+                        <!-- Box Kelas -->
                         <div class="col-lg-3 col-6">
-                            <!-- small box -->
                             <div class="small-box bg-warning">
                                 <div class="inner">
                                     <h3>{{ jumlah_kelas }}</h3>
@@ -74,8 +75,9 @@
                                 <a href="{{ url_for('kelola_kelas') }}" class="small-box-footer">Info lebih lanjut <i class="fas fa-arrow-circle-right"></i></a>
                             </div>
                         </div>
+
+                        <!-- Box Laporan Absensi -->
                         <div class="col-lg-3 col-6">
-                            <!-- small box -->
                             <div class="small-box bg-danger">
                                 <div class="inner">
                                     <h3>{{ jumlah_laporan_absensi }}</h3>
@@ -88,18 +90,106 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Status Proses Training Mahasiswa -->
+                    <div class="row">
+                        <div class="col-lg-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3 class="card-title">Status Proses Training Mahasiswa</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div id="training-status">Memeriksa status training...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Status Absensi dan Stop Kelas -->
+                    <div class="row">
+                        <div class="col-lg-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3 class="card-title">Proses Absensi Kelas</h3>
+                                </div>
+                                <div class="card-body">
+                                    <div id="absensi-status">Tidak ada kelas yang sedang berlangsung.</div>
+                                    <button id="stop-class" class="btn btn-danger" onclick="stopClass()">Stop Kelas</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </section>
         </div>
 
         <!-- Footer -->
         {% include 'admin/footer.html' %}
-
     </div>
 
     <!-- Script JS AdminLTE -->
     <script src="{{ url_for('static', filename='admin_lte/plugins/jquery/jquery.min.js') }}"></script>
     <script src="{{ url_for('static', filename='admin_lte/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
     <script src="{{ url_for('static', filename='admin_lte/dist/js/adminlte.min.js') }}"></script>
+
+    <!-- Script untuk AJAX polling -->
+    <script>
+        function checkTrainingStatus() {
+            $.ajax({
+                url: "/check_all_training_status",
+                success: function(response) {
+                    if (response.status === 'training_in_progress') {
+                        let mahasiswaList = response.mahasiswa.map(m => `Training sedang berlangsung untuk NIM: ${m.nim} (${m.nama})`).join('<br>');
+                        $('#training-status').html(mahasiswaList);
+                    } else {
+                        $('#training-status').text('Tidak ada proses training yang sedang berlangsung.');
+                    }
+                }
+            });
+        }
+
+        function checkAbsensiStatus() {
+            $.ajax({
+                url: "/check_absensi_status",
+                success: function(response) {
+                    if (response.status === 'kelas_berlangsung') {
+                        $('#absensi-status').text(`Kelas ${response.nama_kelas} sedang berlangsung.`);
+                    } else {
+                        $('#absensi-status').text('Tidak ada kelas yang sedang berlangsung.');
+                    }
+                }
+            });
+        }
+
+        // Polling setiap 5 detik untuk memeriksa status training dan absensi
+        setInterval(function() {
+            checkTrainingStatus();
+            checkAbsensiStatus();
+        }, 5000);
+
+        // Fungsi untuk menghentikan kelas
+        function stopClass() {
+            $.ajax({
+                url: "/stop_class",
+                method: "POST",
+                success: function(response) {
+                    if (response.success) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Kelas dihentikan',
+                            text: response.message
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: response.message
+                        });
+                    }
+                }
+            });
+        }
+    </script>
 </body>
 </html>

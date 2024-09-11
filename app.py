@@ -1,3 +1,4 @@
+from cProfile import label
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from pymongo import MongoClient
 from config import MONGO_URI, DB_NAME, SECRET_KEY
@@ -5,7 +6,14 @@ from bson.objectid import ObjectId
 import pandas as pd
 from flask import send_file
 from datetime import datetime
-
+import os
+import shutil
+from werkzeug.utils import secure_filename
+from training.train_model import train_model  # Fungsi untuk training model
+from flask import session
+import threading
+import logging
+import cv2
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
 
@@ -46,16 +54,21 @@ def admin_dashboard():
         jumlah_dosen = db.dosen.count_documents({})
         jumlah_kelas = db.kelas.count_documents({})
         jumlah_laporan_absensi = db.absensi.count_documents({})
-        return render_template('admin/dashboard.html', 
-                               jumlah_mahasiswa=jumlah_mahasiswa, 
-                               jumlah_dosen=jumlah_dosen, 
-                               jumlah_kelas=jumlah_kelas, 
-                               jumlah_laporan_absensi=jumlah_laporan_absensi)
+
+        # Status proses training
+        training_status = session.get('training_status', None)  # Ambil status training dari session
+
+        return render_template('admin/dashboard.html',
+                               jumlah_mahasiswa=jumlah_mahasiswa,
+                               jumlah_dosen=jumlah_dosen,
+                               jumlah_kelas=jumlah_kelas,
+                               jumlah_laporan_absensi=jumlah_laporan_absensi,
+                               training_status=training_status)
     else:
         return redirect(url_for('admin_login'))
 
 # Kelola Mahasiswa
-@app.route('/admin/kelola_mahasiswa', methods=['GET', 'POST'])
+@app.route('/admin/kelola_mahasiswa', methods=['GET'])
 def kelola_mahasiswa():
     if 'admin_logged_in' in session:
         mahasiswa = list(db.mahasiswa.find())  # Ubah menjadi list
@@ -64,7 +77,7 @@ def kelola_mahasiswa():
         return redirect(url_for('admin_login'))
 
 # Tambah Mahasiswa
-@app.route('/admin/tambah_mahasiswa', methods=['GET', 'POST'])
+@app.route('/admin/tambah_mahasiswa', methods=['POST', 'GET'])
 def tambah_mahasiswa():
     if 'admin_logged_in' in session:
         if request.method == 'POST':
@@ -72,12 +85,42 @@ def tambah_mahasiswa():
             nama = request.form['nama']
             email = request.form['email']
             nomor_hp = request.form['nomor_hp']
-            db.mahasiswa.insert_one({
-                "nim": nim,
-                "nama": nama,
-                "email": email,
-                "nomor_hp": nomor_hp
-            })
+            foto_mahasiswa = request.files.getlist('foto_mahasiswa[]')
+
+            # Simpan data mahasiswa ke database
+            mahasiswa = {
+                'nim': nim,
+                'nama': nama,
+                'email': email,
+                'nomor_hp': nomor_hp,
+                'trained': False
+            }
+            db.mahasiswa.insert_one(mahasiswa)
+
+            # Hanya proses jika ada file yang diunggah dan valid
+            if foto_mahasiswa and foto_mahasiswa[0].filename != '':
+                path = os.path.join('training/images', nim)
+                if not os.path.exists(path):
+                    os.makedirs(path)
+
+                for foto in foto_mahasiswa:
+                    if foto and foto.filename != '':  # Pastikan foto valid
+                        filename = secure_filename(foto.filename)
+                        foto.save(os.path.join(path, filename))
+
+                # Mulai training jika ada minimal 5 foto
+                if len(foto_mahasiswa) >= 5:
+                    session['training_status'] = "Training sedang berlangsung untuk mahasiswa dengan NIM: {}".format(nim)
+                    train_model(nim)  # Lakukan training model
+                    session['training_status'] = "Training selesai untuk mahasiswa dengan NIM: {}".format(nim)
+                    db.mahasiswa.update_one({'nim': nim}, {"$set": {"trained": True}})
+                    flash('Mahasiswa berhasil ditambahkan dan model berhasil di-train.', 'success')
+                else:
+                    flash('Mahasiswa berhasil ditambahkan, namun perlu upload minimal 5 foto untuk training.', 'warning')
+            else:
+                flash('Mahasiswa berhasil ditambahkan, namun tidak ada foto yang diunggah.', 'info')
+
+            # Redirect setelah POST untuk memunculkan flash message
             return redirect(url_for('kelola_mahasiswa'))
         return render_template('admin/mahasiswa/tambah_mahasiswa.html')
     else:
@@ -88,34 +131,143 @@ def tambah_mahasiswa():
 def edit_mahasiswa(id):
     if 'admin_logged_in' in session:
         mahasiswa = db.mahasiswa.find_one({"_id": ObjectId(id)})
-        if request.method == 'POST':
-            nim = request.form['nim']
-            nama = request.form['nama']
-            email = request.form['email']
-            nomor_hp = request.form['nomor_hp']
-            db.mahasiswa.update_one({"_id": ObjectId(id)}, {
-                "$set": {
-                    "nim": nim,
-                    "nama": nama,
-                    "email": email,
-                    "nomor_hp": nomor_hp
-                }
-            })
+        if mahasiswa:
+            if request.method == 'POST':
+                nim = request.form['nim']
+                nama = request.form['nama']
+                email = request.form['email']
+                nomor_hp = request.form['nomor_hp']
+                foto_mahasiswa = request.files.getlist('foto_mahasiswa[]')
+
+                # Update data mahasiswa di database
+                db.mahasiswa.update_one({'_id': ObjectId(id)}, {
+                    "$set": {
+                        'nim': nim,
+                        'nama': nama,
+                        'email': email,
+                        'nomor_hp': nomor_hp
+                    }
+                })
+
+                # Proses unggah foto hanya jika ada file yang diunggah
+                if foto_mahasiswa and foto_mahasiswa[0].filename != '':
+                    folder_path = os.path.join('training/images', nim)
+
+                    # Buat direktori jika belum ada
+                    if not os.path.exists(folder_path):
+                        os.makedirs(folder_path)
+
+                    # Simpan foto yang diunggah
+                    for foto in foto_mahasiswa:
+                        filename = secure_filename(foto.filename)
+                        foto.save(os.path.join(folder_path, filename))
+
+                # Proses training ulang
+                if 'retrain' in request.form:
+                    folder_path = os.path.join('training/images', nim)
+
+                    # Cek apakah folder berisi foto
+                    if not os.path.exists(folder_path) or len(os.listdir(folder_path)) < 5:
+                        flash('Training gagal. Tidak ada cukup foto untuk mahasiswa ini. Minimal 5 foto diperlukan.', 'danger')
+                    else:
+                        try:
+                            train_model(nim)
+                            db.mahasiswa.update_one({'_id': ObjectId(id)}, {"$set": {"trained": True}})
+                            flash('Training ulang berhasil.', 'success')
+                        except Exception as e:
+                            flash(f'Training ulang gagal: {str(e)}', 'danger')
+
+                flash('Data mahasiswa berhasil diperbarui.', 'success')
+                return redirect(url_for('kelola_mahasiswa'))
+
+            return render_template('admin/mahasiswa/edit_mahasiswa.html', mahasiswa=mahasiswa)
+        else:
+            flash('Mahasiswa tidak ditemukan.', 'danger')
             return redirect(url_for('kelola_mahasiswa'))
-        return render_template('admin/mahasiswa/edit_mahasiswa.html', mahasiswa=mahasiswa)
     else:
         return redirect(url_for('admin_login'))
 
+#training foto
+@app.route('/admin/train_mahasiswa/<id>', methods=['GET'])
+def train_mahasiswa(id):
+    if 'admin_logged_in' in session:
+        mahasiswa = db.mahasiswa.find_one({"_id": ObjectId(id)})
+        if mahasiswa:
+            nim = mahasiswa['nim']
+            folder_path = os.path.join('training/images', nim)
+
+            # Cek apakah folder ada dan tidak kosong
+            if not os.path.exists(folder_path) or len(os.listdir(folder_path)) < 5:
+                flash('Training gagal. Pastikan ada minimal 5 foto untuk mahasiswa ini.', 'danger')
+                return redirect(url_for('kelola_mahasiswa'))
+
+            try:
+                # Update status di database
+                db.mahasiswa.update_one({'nim': nim}, {"$set": {"training_in_progress": True}})
+                
+                # Jalankan training di thread terpisah
+                training_thread = threading.Thread(target=background_training, args=(nim,))
+                training_thread.start()
+
+                flash(f'Training sedang berlangsung untuk NIM {nim}', 'info')
+            except Exception as e:
+                flash(f'Training gagal: {str(e)}', 'danger')
+
+        else:
+            flash('Mahasiswa tidak ditemukan.', 'danger')
+
+        return redirect(url_for('kelola_mahasiswa'))
+    else:
+        return redirect(url_for('admin_login'))
+
+# Fungsi untuk menjalankan training di latar belakang
+def background_training(nim):
+    try:
+        logging.info(f'Training dimulai untuk NIM {nim}')
+        train_model(nim)  # Fungsi training model
+        db.mahasiswa.update_one({'nim': nim}, {"$set": {"trained": True, "training_in_progress": False}})
+        logging.info(f'Training selesai untuk NIM {nim}')
+    except Exception as e:
+        logging.error(f'Training gagal untuk NIM {nim}: {str(e)}')
+
+# Endpoint untuk memeriksa status training secara real-time
+@app.route('/check_all_training_status')
+def check_all_training_status():
+    # Ambil semua mahasiswa yang sedang dalam proses training
+    mahasiswa_in_training = list(db.mahasiswa.find({"training_in_progress": True}, {"nim": 1, "nama": 1}))
+    if mahasiswa_in_training:
+        return {"status": "training_in_progress", "mahasiswa": mahasiswa_in_training}
+    return {"status": "no_training"}
+
+
 # Hapus Mahasiswa
-@app.route('/admin/hapus_mahasiswa/<id>', methods=['GET', 'POST'])
+@app.route('/admin/hapus_mahasiswa/<id>', methods=['POST' , 'GET'])
 def hapus_mahasiswa(id):
     if 'admin_logged_in' in session:
-        # Hapus mahasiswa dari koleksi mahasiswa
-        db.mahasiswa.delete_one({"_id": ObjectId(id)})
+        mahasiswa = db.mahasiswa.find_one({"_id": ObjectId(id)})
+        if mahasiswa:
+            nim = mahasiswa['nim']
 
-        # Perbarui semua kelas yang memiliki mahasiswa ini
-        db.kelas.update_many({}, {"$pull": {"mahasiswa": ObjectId(id)}})
-        flash('Mahasiswa berhasil dihapus.', 'success')  # Pesan flash
+            # Hapus data mahasiswa dari database
+            db.mahasiswa.delete_one({"_id": ObjectId(id)})
+            flash('Mahasiswa berhasil dihapus.', 'success')
+
+            # Hapus foto dari folder training/images
+            image_path = os.path.join('training/images', nim)
+            if os.path.exists(image_path):
+                shutil.rmtree(image_path)  # Hapus seluruh folder beserta foto
+
+            # Hapus model mahasiswa dari folder models
+            model_path = os.path.join('models', nim)
+            if os.path.exists(model_path):
+                shutil.rmtree(model_path)  # Hapus seluruh folder beserta model
+
+            # Perbarui data kelas yang berhubungan dengan mahasiswa ini
+            db.kelas.update_many({}, {"$pull": {"mahasiswa": ObjectId(id)}})
+
+        else:
+            flash('Mahasiswa tidak ditemukan.', 'danger')
+
         return redirect(url_for('kelola_mahasiswa'))
     else:
         return redirect(url_for('admin_login'))
@@ -545,8 +697,127 @@ def dosen_unduh_absensi():
     else:
         return redirect(url_for('dosen_login'))
 
-# sudah di ujung aspal
+#########################
+#FUNGSI FACE RECOGNITION#
+#########################
+
+# Inisialisasi variabel capture sebagai global
+capture = None
+
+#proses absen
+def start_class(nim):
+    global capture
+    print(f"Memulai kelas untuk NIM: {nim}")
+    capture = cv2.VideoCapture(0)  # Inisialisasi kamera
+
+    # Path ke file haarcascade
+    face_cascade = cv2.CascadeClassifier('utils/haarcascade_frontalface_default.xml')
+
+    if face_cascade.empty():
+        raise Exception("Haarcascade file not found or failed to load")
+
+    # Path ke model LBP mahasiswa berdasarkan NIM
+    model_path = os.path.join('models', nim, f'{nim}_model.yml')
+
+    if not os.path.exists(model_path):
+        print(f"Model untuk NIM {nim} tidak ditemukan di {model_path}")
+        return
+
+    recognizer = cv2.face.LBPHFaceRecognizer_create()
+    recognizer.read(model_path)
+
+    while True:
+        ret, frame = capture.read()
+        if ret:
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+
+            for (x, y, w, h) in faces:
+                face_roi = gray[y:y+h, x:x+w]
+                label, confidence = recognizer.predict(face_roi)
+                
+                if confidence < 50:  # Nilai confidence lebih rendah lebih baik
+                    print(f"Wajah mahasiswa dengan NIM {label} dikenali dengan confidence {confidence}")
+                    
+                    # Validasi apakah label adalah NIM yang valid
+                    if label != 0:
+                        # Simpan absensi ke database
+                        db.absensi.insert_one({
+                            'nim': label,  # Pastikan NIM yang dikenali valid
+                            'waktu': datetime.now(),
+                            'status': 'Hadir'
+                        })
+                        cv2.putText(frame, f"NIM: {label}", (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36,255,12), 2)
+                    else:
+                        print("Wajah dikenali, tetapi NIM tidak valid")
+                else:
+                    print(f"Wajah tidak dikenali dengan confidence {confidence}")
+
+                cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
+
+            cv2.imshow('Camera', frame)
+
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+        else:
+            break
+
+    capture.release()
+    cv2.destroyAllWindows()
+
+# Route untuk memulai kelas manual oleh admin
+@app.route('/admin/start_kelas/<kelas_id>', methods=['POST'])
+def start_kelas(kelas_id):
+    if 'admin_logged_in' in session:
+        kelas = db.kelas.find_one({"_id": ObjectId(kelas_id)})
+
+        if kelas:
+            # Tandai bahwa kelas sedang berlangsung
+            db.kelas.update_one({"_id": ObjectId(kelas_id)}, {"$set": {"kelas_berlangsung": True}})
+            
+            # Ambil mahasiswa yang terdaftar di kelas ini
+            mahasiswa_ids = kelas['mahasiswa']
+            mahasiswa_list = db.mahasiswa.find({"_id": {"$in": mahasiswa_ids}})
+
+            # Mulai kelas untuk setiap mahasiswa yang terdaftar
+            for mahasiswa in mahasiswa_list:
+                nim = mahasiswa['nim']  # Ambil NIM dari data mahasiswa
+                threading.Thread(target=start_class, args=(nim,)).start()  # Jalankan proses di thread terpisah
+                
+            flash(f"Kelas {kelas['nama_kelas']} dimulai secara manual.", "success")
+        else:
+            flash("Kelas tidak ditemukan.", "danger")
+
+        return redirect(url_for('kelola_kelas'))
+    else:
+        return redirect(url_for('admin_login'))
+
+# Endpoint untuk memeriksa status absensi secara real-time
+@app.route('/check_absensi_status', methods=['GET'])
+def check_absensi_status():
+    # Ambil status kelas yang sedang berlangsung dari database
+    kelas_berlangsung = db.kelas.find_one({"kelas_berlangsung": True})
+    
+    if kelas_berlangsung:
+        return {"status": "kelas_berlangsung", "nama_kelas": kelas_berlangsung["nama_kelas"]}
+    else:
+        return {"status": "no_class"}
+
+# Route untuk menghentikan kelas
+@app.route('/stop_class', methods=['POST'])
+def stop_class():
+    global capture
+    try:
+        if capture and capture.isOpened():
+            capture.release()
+            cv2.destroyAllWindows()
+        
+        # Update status kelas di database menjadi tidak berlangsung
+        db.kelas.update_many({}, {"$set": {"kelas_berlangsung": False}})
+        
+        return {"success": True, "message": "Kelas berhasil dihentikan."}
+    except Exception as e:
+        return {"success": False, "message": f"Terjadi kesalahan: {str(e)}"}
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
-    #app.run(debug=True)
+    app.run(debug=True)
