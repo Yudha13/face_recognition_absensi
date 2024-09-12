@@ -57,5 +57,4 @@ Kami menyambut kontribusi dari siapa saja. Jika tertarik untuk berkontribusi, si
 ## 📝 Lisensi
 Proyek ini dilisensikan di bawah [Lisensi MIT](LICENSE).
 
-## Lisensi OpenCV dan Haar Cascade
-Bagian dari proyek ini menggunakan OpenCV dan Haar Cascade yang dilisensikan di bawah BSD 3-Clause License. Lisensi lengkapnya dapat ditemukan di file `LICENSE_OPEN_CV.md`.
+Bagian dari proyek ini menggunakan OpenCV dan Haar Cascade yang dilisensikan di bawah [BSD 3-Clause License](LICENSE_OPEN_CV.md).
