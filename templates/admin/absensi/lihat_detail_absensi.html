@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detail Absensi</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/dist/css/adminlte.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/fontawesome-free/css/all.min.css') }}">
+</head>
+<body class="hold-transition sidebar-mini layout-fixed">
+    <div class="wrapper">
+
+        <!-- Navbar -->
+        {% include 'admin/navbar.html' %}
+
+        <!-- Main Sidebar Container -->
+        {% include 'admin/sidebar.html' %}
+
+        <!-- Content Wrapper -->
+        <div class="content-wrapper">
+            <!-- Content Header -->
+            <section class="content-header">
+                <div class="container-fluid">
+                    <div class="row mb-2">
+                        <div class="col-sm-6">
+                            <h1>Detail Absensi Tanggal {{ absensi.tanggal.strftime('%d-%m-%Y') if absensi.tanggal else 'Tidak tersedia' }}</h1>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Main content -->
+            <section class="content">
+                <div class="container-fluid">
+                    <!-- Card untuk daftar detail absensi -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Daftar Mahasiswa</h3>
+                        </div>
+                        <div class="card-body table-responsive">
+                            <table class="table table-bordered table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Nama Mahasiswa</th>
+                                        <th>Status Kehadiran</th>
+                                        <th>Waktu Kehadiran</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for mahasiswa in mahasiswa_list %}
+                                    <tr>
+                                        <td>{{ mahasiswa.nama }}</td>
+                                        <!-- Status dan waktu_kehadiran diambil dari absensi -->
+                                        <td>{{ mahasiswa.status_kehadiran if mahasiswa.status_kehadiran else 'Tidak ada' }}</td>
+                                        <td>{{ mahasiswa.waktu_kehadiran.strftime('%H:%M:%S') if mahasiswa.waktu_kehadiran else 'Tidak ada' }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Footer -->
+        {% include 'admin/footer.html' %}
+    </div>
+
+    <!-- Script JS AdminLTE -->
+    <script src="{{ url_for('static', filename='admin_lte/plugins/jquery/jquery.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin_lte/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin_lte/dist/js/adminlte.min.js') }}"></script>
+</body>
+</html>

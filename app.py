@@ -14,6 +14,7 @@ from flask import session
 import threading
 import logging
 import cv2
+
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
 
@@ -53,7 +54,9 @@ def admin_dashboard():
         jumlah_mahasiswa = db.mahasiswa.count_documents({})
         jumlah_dosen = db.dosen.count_documents({})
         jumlah_kelas = db.kelas.count_documents({})
-        jumlah_laporan_absensi = db.absensi.count_documents({})
+
+        # Menghitung total absensi dari semua kelas
+        total_absensi = db.absensi.count_documents({})
 
         # Status proses training
         training_status = session.get('training_status', None)  # Ambil status training dari session
@@ -62,10 +65,24 @@ def admin_dashboard():
                                jumlah_mahasiswa=jumlah_mahasiswa,
                                jumlah_dosen=jumlah_dosen,
                                jumlah_kelas=jumlah_kelas,
-                               jumlah_laporan_absensi=jumlah_laporan_absensi,
+                               jumlah_laporan_absensi=total_absensi,
                                training_status=training_status)
     else:
         return redirect(url_for('admin_login'))
+
+#rute check status absensi
+@app.route('/check_absensi_status', methods=['GET'])
+def check_absensi_status():
+    # Ambil status kelas yang sedang berlangsung dari database
+    kelas_berlangsung = db.kelas.find_one({"kelas_berlangsung": True})
+
+    if kelas_berlangsung:
+        return {"status": "kelas_berlangsung", "nama_kelas": kelas_berlangsung["nama_kelas"]}
+    else:
+        return {"status": "no_class"}
+
+
+## RUTE PENGELOLAAN MAHASISWA
 
 # Kelola Mahasiswa
 @app.route('/admin/kelola_mahasiswa', methods=['GET'])
@@ -230,14 +247,16 @@ def background_training(nim):
     except Exception as e:
         logging.error(f'Training gagal untuk NIM {nim}: {str(e)}')
 
-# Endpoint untuk memeriksa status training secara real-time
+# Endpoint untuk memeriksa status training secara real-time dengan progress
 @app.route('/check_all_training_status')
 def check_all_training_status():
-    # Ambil semua mahasiswa yang sedang dalam proses training
-    mahasiswa_in_training = list(db.mahasiswa.find({"training_in_progress": True}, {"nim": 1, "nama": 1}))
+    # Ambil semua mahasiswa yang sedang dalam proses training dan progressnya
+    mahasiswa_in_training = list(db.mahasiswa.find({"training_in_progress": True}, {"nim": 1, "nama": 1, "progress": 1}))
+    
     if mahasiswa_in_training:
-        return {"status": "training_in_progress", "mahasiswa": mahasiswa_in_training}
-    return {"status": "no_training"}
+        return {"status": "training_in_progress", "mahasiswa": mahasiswa_in_training}, 200
+    
+    return {"status": "no_training"}, 204
 
 
 # Hapus Mahasiswa
@@ -261,6 +280,9 @@ def hapus_mahasiswa(id):
             model_path = os.path.join('models', nim)
             if os.path.exists(model_path):
                 shutil.rmtree(model_path)  # Hapus seluruh folder beserta model
+            
+            # Pastikan status 'trained' tidak aktif
+            db.mahasiswa.update_one({'nim': nim}, {"$set": {"trained": False}})
 
             # Perbarui data kelas yang berhubungan dengan mahasiswa ini
             db.kelas.update_many({}, {"$pull": {"mahasiswa": ObjectId(id)}})
@@ -271,6 +293,8 @@ def hapus_mahasiswa(id):
         return redirect(url_for('kelola_mahasiswa'))
     else:
         return redirect(url_for('admin_login'))
+
+## RUTE PENGELOLAAN DOSEN
 
 # Kelola Dosen
 @app.route('/admin/kelola_dosen', methods=['GET', 'POST'])
@@ -337,6 +361,8 @@ def hapus_dosen(id):
         return redirect(url_for('kelola_dosen'))
     else:
         return redirect(url_for('admin_login'))
+
+## RUTE PENGELOLAAN KELAS
 
 # Kelola Kelas
 @app.route('/admin/kelola_kelas', methods=['GET', 'POST'])
@@ -523,16 +549,109 @@ def simpan_mahasiswa_ke_kelas(id):
     else:
         return redirect(url_for('admin_login'))
 
+## RUTE LAPORAN ABSENSI
+
 #laporan absensi  
 @app.route('/admin/laporan_absensi')
 def laporan_absensi():
     if 'admin_logged_in' in session:
-        laporan_absensi = db.absensi.find()
-        return render_template('admin/absensi/laporan_absensi.html', laporan_absensi=laporan_absensi)
+        # Ambil daftar kelas beserta detail
+        kelas_list = list(db.kelas.aggregate([
+            {
+                '$lookup': {
+                    'from': 'dosen',
+                    'localField': 'dosen_pengampu',
+                    'foreignField': '_id',
+                    'as': 'dosen'
+                }
+            },
+            {
+                '$unwind': {
+                    'path': '$dosen',
+                    'preserveNullAndEmptyArrays': True
+                }
+            },
+            {
+                '$project': {
+                    'nama_kelas': 1,
+                    'dosen.nama': 1,
+                    'jumlah_mahasiswa': {'$size': '$mahasiswa'},
+                    'hari': 1,
+                    'jam_mulai': 1,
+                    'jam_selesai': 1,
+                    '_id': 1  # Pastikan kelas_id termasuk di sini
+                }
+            }
+        ]))
+
+        return render_template('admin/absensi/laporan_absensi.html', kelas_list=kelas_list)
     else:
         return redirect(url_for('admin_login'))
 
-#unduh laporan absensi
+#rute lihat absensi
+@app.route('/admin/lihat_absensi/<kelas_id>')
+def lihat_absensi(kelas_id):
+    if 'admin_logged_in' in session:
+        # Ambil data absensi berdasarkan kelas yang dipilih
+        absensi_list = list(db.absensi.aggregate([
+            {
+                '$match': {
+                    'kelas_id': ObjectId(kelas_id)
+                }
+            },
+            {
+                '$group': {
+                    '_id': '$tanggal',  # Gunakan _id sebagai tanggal
+                    'jumlah_hadir': {'$sum': 1}
+                }
+            }
+        ]))
+
+        kelas = db.kelas.find_one({"_id": ObjectId(kelas_id)})
+
+        return render_template('admin/absensi/lihat_absensi.html', absensi_list=absensi_list, kelas=kelas)
+    else:
+        return redirect(url_for('admin_login'))
+
+#rute detail absensi
+@app.route('/admin/lihat_detail_absensi/<absensi_id>')
+def lihat_detail_absensi(absensi_id):
+    if 'admin_logged_in' in session:
+        # Ambil data absensi berdasarkan absensi_id
+        absensi = db.absensi.find_one({"_id": ObjectId(absensi_id)})
+        if not absensi:
+            flash("Absensi tidak ditemukan", "danger")
+            return redirect(url_for('laporan_absensi'))
+
+        # Ambil data mahasiswa yang hadir pada absensi tersebut
+        mahasiswa_list = list(db.mahasiswa.aggregate([
+            {
+                '$match': {
+                    '_id': {'$in': [ObjectId(mhs_id) for mhs_id in absensi.get('mahasiswa_ids', [])]}
+                }
+            },
+            {
+                '$lookup': {
+                    'from': 'absensi',
+                    'localField': '_id',
+                    'foreignField': 'mahasiswa_ids',
+                    'as': 'absensi_data'
+                }
+            },
+            {
+                '$project': {
+                    'nama': 1,
+                    'status_kehadiran': {'$arrayElemAt': ['$absensi_data.status', 0]},
+                    'waktu_kehadiran': {'$arrayElemAt': ['$absensi_data.waktu', 0]}
+                }
+            }
+        ]))
+
+        return render_template('admin/absensi/lihat_detail_absensi.html', absensi=absensi, mahasiswa_list=mahasiswa_list)
+    else:
+        return redirect(url_for('admin_login'))
+
+#mengunduh laporan absensi
 @app.route('/admin/unduh_laporan_absensi')
 def unduh_laporan_absensi():
     if 'admin_logged_in' in session:
@@ -557,7 +676,8 @@ def unduh_laporan_absensi():
         return send_file(file_path, as_attachment=True)
     else:
         return redirect(url_for('admin_login'))
-    
+
+
 #########################################
 #Pada Bagian ini adalah rute untuk dosen#
 #########################################
@@ -701,32 +821,43 @@ def dosen_unduh_absensi():
 #FUNGSI FACE RECOGNITION#
 #########################
 
-# Inisialisasi variabel capture sebagai global
-capture = None
+# Inisialisasi variabel flag global untuk menghentikan loop kamera
+running = False
 
-#proses absen
-def start_class(nim):
-    global capture
-    print(f"Memulai kelas untuk NIM: {nim}")
-    capture = cv2.VideoCapture(0)  # Inisialisasi kamera
+# Fungsi untuk proses absensi
+def start_class(kelas_id):
+    global running
+    running = True  # Atur flag running menjadi True ketika kelas dimulai
+    print(f"Memulai absensi untuk kelas {kelas_id}")
+    
+    capture = cv2.VideoCapture(0)
 
-    # Path ke file haarcascade
-    face_cascade = cv2.CascadeClassifier('utils/haarcascade_frontalface_default.xml')
-
-    if face_cascade.empty():
-        raise Exception("Haarcascade file not found or failed to load")
-
-    # Path ke model LBP mahasiswa berdasarkan NIM
-    model_path = os.path.join('models', nim, f'{nim}_model.yml')
-
-    if not os.path.exists(model_path):
-        print(f"Model untuk NIM {nim} tidak ditemukan di {model_path}")
+    if not capture.isOpened():
+        print("Kamera tidak bisa dibuka")
         return
 
-    recognizer = cv2.face.LBPHFaceRecognizer_create()
-    recognizer.read(model_path)
+    # Path ke file haarcascade dan model
+    face_cascade = cv2.CascadeClassifier('utils/haarcascade_frontalface_default.xml')
 
-    while True:
+    # Ambil mahasiswa yang terdaftar di kelas ini
+    kelas = db.kelas.find_one({"_id": ObjectId(kelas_id)})
+    mahasiswa_ids = kelas['mahasiswa']
+    mahasiswa_list = db.mahasiswa.find({"_id": {"$in": mahasiswa_ids}})
+    
+    # Cache model mahasiswa untuk menghindari loading berulang
+    recognizer_dict = {}
+    for mahasiswa in mahasiswa_list:
+        nim = mahasiswa['nim']
+        model_path = os.path.join('models', nim, f'{nim}_model.yml')
+        if os.path.exists(model_path):
+            recognizer = cv2.face.LBPHFaceRecognizer_create()
+            recognizer.read(model_path)
+            recognizer_dict[nim] = recognizer
+
+    # Set untuk menyimpan NIM yang sudah terdaftar hadir
+    hadir_set = set()
+
+    while running:  # Loop berdasarkan flag running
         ret, frame = capture.read()
         if ret:
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -734,24 +865,30 @@ def start_class(nim):
 
             for (x, y, w, h) in faces:
                 face_roi = gray[y:y+h, x:x+w]
-                label, confidence = recognizer.predict(face_roi)
-                
-                if confidence < 50:  # Nilai confidence lebih rendah lebih baik
-                    print(f"Wajah mahasiswa dengan NIM {label} dikenali dengan confidence {confidence}")
-                    
-                    # Validasi apakah label adalah NIM yang valid
-                    if label != 0:
-                        # Simpan absensi ke database
-                        db.absensi.insert_one({
-                            'nim': label,  # Pastikan NIM yang dikenali valid
-                            'waktu': datetime.now(),
-                            'status': 'Hadir'
-                        })
-                        cv2.putText(frame, f"NIM: {label}", (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36,255,12), 2)
-                    else:
-                        print("Wajah dikenali, tetapi NIM tidak valid")
-                else:
-                    print(f"Wajah tidak dikenali dengan confidence {confidence}")
+
+                # Loop melalui semua mahasiswa untuk memproses model masing-masing
+                for nim, recognizer in recognizer_dict.items():
+                    if nim not in hadir_set:  # Periksa jika mahasiswa belum terdaftar hadir
+                        label, confidence = recognizer.predict(face_roi)
+
+                        # Validasi NIM positif dan confidence rendah
+                        if confidence < 50 and label > 0:  # Pastikan confidence rendah dan label (NIM) positif
+                            print(f"Wajah mahasiswa dengan NIM {label} dikenali dengan confidence {confidence}")
+                            if label != 0:
+                                # Simpan absensi dengan informasi kelas jika belum tercatat
+                                db.absensi.insert_one({
+                                    'nim': label,
+                                    'kelas_id': ObjectId(kelas_id),  # Tambahkan ID kelas
+                                    'waktu': datetime.now(),
+                                    'status': 'Hadir'
+                                })
+                                # Tambahkan NIM ke set hadir untuk menghindari pencatatan ganda
+                                hadir_set.add(nim)
+
+                                # Tampilkan NIM di frame
+                                cv2.putText(frame, f"NIM: {label}", (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36,255,12), 2)
+                        else:
+                            print(f"Wajah tidak dikenali atau NIM tidak valid: {label}, confidence: {confidence}")
 
                 cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
 
@@ -759,13 +896,12 @@ def start_class(nim):
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-        else:
-            break
 
     capture.release()
     cv2.destroyAllWindows()
+    print("Proses absensi kelas dihentikan.")
 
-# Route untuk memulai kelas manual oleh admin
+# Route untuk memulai kelas oleh admin
 @app.route('/admin/start_kelas/<kelas_id>', methods=['POST'])
 def start_kelas(kelas_id):
     if 'admin_logged_in' in session:
@@ -775,16 +911,10 @@ def start_kelas(kelas_id):
             # Tandai bahwa kelas sedang berlangsung
             db.kelas.update_one({"_id": ObjectId(kelas_id)}, {"$set": {"kelas_berlangsung": True}})
             
-            # Ambil mahasiswa yang terdaftar di kelas ini
-            mahasiswa_ids = kelas['mahasiswa']
-            mahasiswa_list = db.mahasiswa.find({"_id": {"$in": mahasiswa_ids}})
-
-            # Mulai kelas untuk setiap mahasiswa yang terdaftar
-            for mahasiswa in mahasiswa_list:
-                nim = mahasiswa['nim']  # Ambil NIM dari data mahasiswa
-                threading.Thread(target=start_class, args=(nim,)).start()  # Jalankan proses di thread terpisah
-                
-            flash(f"Kelas {kelas['nama_kelas']} dimulai secara manual.", "success")
+            # Mulai proses absensi untuk seluruh mahasiswa dalam satu kelas
+            threading.Thread(target=start_class, args=(kelas_id,)).start()  # Mulai kelas untuk semua mahasiswa di kelas
+            
+            flash(f"Kelas {kelas['nama_kelas']} dimulai.", "success")
         else:
             flash("Kelas tidak ditemukan.", "danger")
 
@@ -792,26 +922,14 @@ def start_kelas(kelas_id):
     else:
         return redirect(url_for('admin_login'))
 
-# Endpoint untuk memeriksa status absensi secara real-time
-@app.route('/check_absensi_status', methods=['GET'])
-def check_absensi_status():
-    # Ambil status kelas yang sedang berlangsung dari database
-    kelas_berlangsung = db.kelas.find_one({"kelas_berlangsung": True})
-    
-    if kelas_berlangsung:
-        return {"status": "kelas_berlangsung", "nama_kelas": kelas_berlangsung["nama_kelas"]}
-    else:
-        return {"status": "no_class"}
-
 # Route untuk menghentikan kelas
 @app.route('/stop_class', methods=['POST'])
 def stop_class():
-    global capture
+    global running
+    running = False  # Atur flag running menjadi False untuk menghentikan loop kamera
+
+    # Hentikan kamera jika masih terbuka di thread
     try:
-        if capture and capture.isOpened():
-            capture.release()
-            cv2.destroyAllWindows()
-        
         # Update status kelas di database menjadi tidak berlangsung
         db.kelas.update_many({}, {"$set": {"kelas_berlangsung": False}})
         

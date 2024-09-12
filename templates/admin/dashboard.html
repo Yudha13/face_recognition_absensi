@@ -1,195 +1,174 @@
+<!-- templates/admin/dashboard.html -->
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard Admin</title>
-    <!-- Link ke CSS AdminLTE -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/dist/css/adminlte.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/fontawesome-free/css/all.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/dist/css/adminlte.min.css') }}">
 </head>
 <body class="hold-transition sidebar-mini layout-fixed">
-    <div class="wrapper">
+<div class="wrapper">
 
-        <!-- Navbar -->
-        {% include 'admin/navbar.html' %}
+    <!-- Navbar -->
+    {% include 'admin/navbar.html' %}
 
-        <!-- Main Sidebar Container -->
-        {% include 'admin/sidebar.html' %}
+    <!-- Sidebar -->
+    {% include 'admin/sidebar.html' %}
 
-        <!-- Content Wrapper. Contains page content -->
-        <div class="content-wrapper">
-            <!-- Content Header (Page header) -->
-            <section class="content-header">
-                <div class="container-fluid">
-                    <div class="row mb-2">
-                        <div class="col-sm-6">
-                            <h1>Dashboard</h1>
+    <!-- Content Wrapper -->
+    <div class="content-wrapper">
+        <!-- Content Header -->
+        <section class="content-header">
+            <div class="container-fluid">
+                <div class="row mb-2">
+                    <div class="col-sm-6">
+                        <h1>Dashboard</h1>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main content -->
+        <section class="content">
+            <div class="container-fluid">
+                <!-- Small boxes (Stat box) -->
+                <div class="row">
+                    <!-- Box Mahasiswa -->
+                    <div class="col-lg-3 col-6">
+                        <div class="small-box bg-info">
+                            <div class="inner">
+                                <h3>{{ jumlah_mahasiswa }}</h3>
+                                <p>Mahasiswa</p>
+                            </div>
+                            <div class="icon">
+                                <i class="fas fa-user-graduate"></i>
+                            </div>
+                            <a href="{{ url_for('kelola_mahasiswa') }}" class="small-box-footer">Info lebih lanjut <i class="fas fa-arrow-circle-right"></i></a>
+                        </div>
+                    </div>
+
+                    <!-- Box Dosen -->
+                    <div class="col-lg-3 col-6">
+                        <div class="small-box bg-success">
+                            <div class="inner">
+                                <h3>{{ jumlah_dosen }}</h3>
+                                <p>Dosen</p>
+                            </div>
+                            <div class="icon">
+                                <i class="fas fa-chalkboard-teacher"></i>
+                            </div>
+                            <a href="{{ url_for('kelola_dosen') }}" class="small-box-footer">Info lebih lanjut <i class="fas fa-arrow-circle-right"></i></a>
+                        </div>
+                    </div>
+
+                    <!-- Box Kelas -->
+                    <div class="col-lg-3 col-6">
+                        <div class="small-box bg-warning">
+                            <div class="inner">
+                                <h3>{{ jumlah_kelas }}</h3>
+                                <p>Kelas</p>
+                            </div>
+                            <div class="icon">
+                                <i class="fas fa-school"></i>
+                            </div>
+                            <a href="{{ url_for('kelola_kelas') }}" class="small-box-footer">Info lebih lanjut <i class="fas fa-arrow-circle-right"></i></a>
+                        </div>
+                    </div>
+
+                    <!-- Box Laporan Absensi -->
+                    <div class="col-lg-3 col-6">
+                        <div class="small-box bg-danger">
+                            <div class="inner">
+                                <h3>{{ jumlah_laporan_absensi }}</h3>
+                                <p>Laporan Absensi</p>
+                            </div>
+                            <div class="icon">
+                                <i class="fas fa-calendar-alt"></i>
+                            </div>
+                            <a href="{{ url_for('laporan_absensi') }}" class="small-box-footer">Info lebih lanjut <i class="fas fa-arrow-circle-right"></i></a>
                         </div>
                     </div>
                 </div>
-            </section>
 
-            <!-- Main content -->
-            <section class="content">
-                <div class="container-fluid">
-                    <div class="row">
-                        <!-- Box Mahasiswa -->
-                        <div class="col-lg-3 col-6">
-                            <div class="small-box bg-info">
-                                <div class="inner">
-                                    <h3>{{ jumlah_mahasiswa }}</h3>
-                                    <p>Mahasiswa</p>
-                                </div>
-                                <div class="icon">
-                                    <i class="fas fa-user-graduate"></i>
-                                </div>
-                                <a href="{{ url_for('kelola_mahasiswa') }}" class="small-box-footer">Info lebih lanjut <i class="fas fa-arrow-circle-right"></i></a>
-                            </div>
-                        </div>
-
-                        <!-- Box Dosen -->
-                        <div class="col-lg-3 col-6">
-                            <div class="small-box bg-success">
-                                <div class="inner">
-                                    <h3>{{ jumlah_dosen }}</h3>
-                                    <p>Dosen</p>
-                                </div>
-                                <div class="icon">
-                                    <i class="fas fa-chalkboard-teacher"></i>
-                                </div>
-                                <a href="{{ url_for('kelola_dosen') }}" class="small-box-footer">Info lebih lanjut <i class="fas fa-arrow-circle-right"></i></a>
-                            </div>
-                        </div>
-
-                        <!-- Box Kelas -->
-                        <div class="col-lg-3 col-6">
-                            <div class="small-box bg-warning">
-                                <div class="inner">
-                                    <h3>{{ jumlah_kelas }}</h3>
-                                    <p>Kelas</p>
-                                </div>
-                                <div class="icon">
-                                    <i class="fas fa-book"></i>
-                                </div>
-                                <a href="{{ url_for('kelola_kelas') }}" class="small-box-footer">Info lebih lanjut <i class="fas fa-arrow-circle-right"></i></a>
-                            </div>
-                        </div>
-
-                        <!-- Box Laporan Absensi -->
-                        <div class="col-lg-3 col-6">
-                            <div class="small-box bg-danger">
-                                <div class="inner">
-                                    <h3>{{ jumlah_laporan_absensi }}</h3>
-                                    <p>Laporan Absensi</p>
-                                </div>
-                                <div class="icon">
-                                    <i class="fas fa-calendar-alt"></i>
-                                </div>
-                                <a href="{{ url_for('laporan_absensi') }}" class="small-box-footer">Info lebih lanjut <i class="fas fa-arrow-circle-right"></i></a>
-                            </div>
-                        </div>
+                <!-- Status Proses Training Mahasiswa -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Status Proses Training Mahasiswa</h3>
                     </div>
-
-                    <!-- Status Proses Training Mahasiswa -->
-                    <div class="row">
-                        <div class="col-lg-12">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h3 class="card-title">Status Proses Training Mahasiswa</h3>
-                                </div>
-                                <div class="card-body">
-                                    <div id="training-status">Memeriksa status training...</div>
-                                </div>
-                            </div>
-                        </div>
+                    <div class="card-body">
+                        <p id="training_status">Tidak ada proses training yang sedang berlangsung.</p>
                     </div>
-
-                    <!-- Status Absensi dan Stop Kelas -->
-                    <div class="row">
-                        <div class="col-lg-12">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h3 class="card-title">Proses Absensi Kelas</h3>
-                                </div>
-                                <div class="card-body">
-                                    <div id="absensi-status">Tidak ada kelas yang sedang berlangsung.</div>
-                                    <button id="stop-class" class="btn btn-danger" onclick="stopClass()">Stop Kelas</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
                 </div>
-            </section>
-        </div>
 
-        <!-- Footer -->
-        {% include 'admin/footer.html' %}
+                <!-- Proses Absensi Kelas -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Proses Absensi Kelas</h3>
+                    </div>
+                    <div class="card-body">
+                        <p id="kelas_status">Tidak ada kelas yang sedang berlangsung.</p>
+                        <button id="stop_kelas_btn" class="btn btn-danger" onclick="stopKelas()">Stop Kelas</button>
+                    </div>
+                </div>
+            </div>
+        </section>
     </div>
 
-    <!-- Script JS AdminLTE -->
-    <script src="{{ url_for('static', filename='admin_lte/plugins/jquery/jquery.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='admin_lte/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='admin_lte/dist/js/adminlte.min.js') }}"></script>
+    <!-- Footer -->
+    {% include 'admin/footer.html' %}
+</div>
 
-    <!-- Script untuk AJAX polling -->
-    <script>
-        function checkTrainingStatus() {
-            $.ajax({
-                url: "/check_all_training_status",
-                success: function(response) {
-                    if (response.status === 'training_in_progress') {
-                        let mahasiswaList = response.mahasiswa.map(m => `Training sedang berlangsung untuk NIM: ${m.nim} (${m.nama})`).join('<br>');
-                        $('#training-status').html(mahasiswaList);
-                    } else {
-                        $('#training-status').text('Tidak ada proses training yang sedang berlangsung.');
-                    }
+<!-- Script AdminLTE -->
+<script src="{{ url_for('static', filename='admin_lte/plugins/jquery/jquery.min.js') }}"></script>
+<script src="{{ url_for('static', filename='admin_lte/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='admin_lte/dist/js/adminlte.min.js') }}"></script>
+
+<!-- Custom Script untuk polling status training dan absensi -->
+<script>
+    // Polling status training mahasiswa
+    function checkTrainingStatus() {
+        $.getJSON("{{ url_for('check_all_training_status') }}", function(data) {
+            if (data.status == "training") {
+                $("#training_status").text("Proses training mahasiswa sedang berlangsung.");
+            } else {
+                $("#training_status").text("Tidak ada proses training yang sedang berlangsung.");
+            }
+        });
+    }
+
+    // Polling status kelas
+    function checkKelasStatus() {
+        $.getJSON("{{ url_for('check_absensi_status') }}", function(data) {
+            if (data.status == "kelas_berlangsung") {
+                $("#kelas_status").text("Proses absensi kelas " + data.nama_kelas + " sedang berlangsung.");
+            } else {
+                $("#kelas_status").text("Tidak ada kelas yang sedang berlangsung.");
+            }
+        });
+    }
+
+    // Stop kelas
+
+    function stopKelas() {
+        $.post("{{ url_for('stop_class') }}", function(data) {
+            if (data.success) {
+                $("#kelas_status").text("Tidak ada kelas yang sedang berlangsung.");
+                    alert(data.message);  // Menampilkan pesan sukses
+            } else {
+                alert("Gagal menghentikan kelas: " + data.message);
                 }
-            });
-        }
+    }).fail(function() {
+        alert("Gagal menghubungi server. Silakan coba lagi.");
+    });
+}
 
-        function checkAbsensiStatus() {
-            $.ajax({
-                url: "/check_absensi_status",
-                success: function(response) {
-                    if (response.status === 'kelas_berlangsung') {
-                        $('#absensi-status').text(`Kelas ${response.nama_kelas} sedang berlangsung.`);
-                    } else {
-                        $('#absensi-status').text('Tidak ada kelas yang sedang berlangsung.');
-                    }
-                }
-            });
-        }
 
-        // Polling setiap 5 detik untuk memeriksa status training dan absensi
-        setInterval(function() {
-            checkTrainingStatus();
-            checkAbsensiStatus();
-        }, 5000);
+    // Polling interval
+    setInterval(checkTrainingStatus, 5000); // Cek setiap 5 detik
+    setInterval(checkKelasStatus, 5000); // Cek setiap 5 detik
+</script>
 
-        // Fungsi untuk menghentikan kelas
-        function stopClass() {
-            $.ajax({
-                url: "/stop_class",
-                method: "POST",
-                success: function(response) {
-                    if (response.success) {
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Kelas dihentikan',
-                            text: response.message
-                        });
-                    } else {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Error',
-                            text: response.message
-                        });
-                    }
-                }
-            });
-        }
-    </script>
 </body>
 </html>
