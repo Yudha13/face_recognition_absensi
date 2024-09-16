@@ -23,7 +23,7 @@
                 <div class="container-fluid">
                     <div class="row mb-2">
                         <div class="col-sm-6">
-                            <h1>Detail Absensi Tanggal {{ absensi.tanggal.strftime('%d-%m-%Y') if absensi.tanggal else 'Tidak tersedia' }}</h1>
+                            <h1>Detail Absensi untuk Tanggal {{ tanggal }}</h1>
                         </div>
                     </div>
                 </div>
@@ -32,27 +32,28 @@
             <!-- Main content -->
             <section class="content">
                 <div class="container-fluid">
-                    <!-- Card untuk daftar detail absensi -->
+                    <!-- Card untuk daftar absensi -->
                     <div class="card">
                         <div class="card-header">
-                            <h3 class="card-title">Daftar Mahasiswa</h3>
+                            <h3 class="card-title">Daftar Mahasiswa Hadir</h3>
                         </div>
                         <div class="card-body table-responsive">
                             <table class="table table-bordered table-hover">
                                 <thead>
                                     <tr>
-                                        <th>Nama Mahasiswa</th>
+                                        <th>NIM</th>
+                                        <th>Nama</th>
                                         <th>Status Kehadiran</th>
                                         <th>Waktu Kehadiran</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for mahasiswa in mahasiswa_list %}
+                                    {% for absensi in detail_absensi %}
                                     <tr>
-                                        <td>{{ mahasiswa.nama }}</td>
-                                        <!-- Status dan waktu_kehadiran diambil dari absensi -->
-                                        <td>{{ mahasiswa.status_kehadiran if mahasiswa.status_kehadiran else 'Tidak ada' }}</td>
-                                        <td>{{ mahasiswa.waktu_kehadiran.strftime('%H:%M:%S') if mahasiswa.waktu_kehadiran else 'Tidak ada' }}</td>
+                                        <td>{{ absensi.nim }}</td>
+                                        <td>{{ absensi.nama }}</td>
+                                        <td>{{ absensi.status }}</td>
+                                        <td>{{ absensi.waktu }}</td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>

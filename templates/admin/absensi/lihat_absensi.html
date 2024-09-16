@@ -49,15 +49,14 @@
                                 <tbody>
                                     {% for absensi in absensi_list %}
                                     <tr>
-                                        <!-- Pastikan 'tanggal' sudah dalam format string jika disimpan sebagai datetime di MongoDB -->
-                                        <td>{{ absensi._id.strftime('%d-%m-%Y') if absensi._id else 'Tanggal tidak tersedia' }}</td>
+                                        <td>{{ absensi._id }}</td>  <!-- Tanggal sudah di-format -->
                                         <td>{{ absensi.jumlah_hadir }}</td>
                                         <td>
-                                            <a href="{{ url_for('lihat_detail_absensi', absensi_id=absensi._id) }}" class="btn btn-primary">Lihat Detail</a>
+                                            <a href="{{ url_for('lihat_detail_absensi', kelas_id=kelas._id, tanggal=absensi._id) }}" class="btn btn-primary">Lihat Detail</a>
                                         </td>
                                     </tr>
                                     {% endfor %}
-                                </tbody>
+                                </tbody>                                                                
                             </table>
                         </div>
                     </div>
