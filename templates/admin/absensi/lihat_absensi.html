@@ -1,19 +1,63 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Daftar Absensi</title>
+    <title>Lihat Absensi</title>
+    <!-- Tambahkan link CSS yang diperlukan -->
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/dist/css/adminlte.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/fontawesome-free/css/all.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            border-color: #007bff;
+            font-weight: bold;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+            border-color: #004085;
+        }
+        .card-header {
+            background-color: #f8f9fa;
+        }
+        .table th, .table td {
+            vertical-align: middle;
+            text-align: center;
+        }
+        .table-responsive {
+            overflow-x: auto;
+        }
+        @media (max-width: 768px) {
+            .content-wrapper {
+                padding: 15px;
+            }
+            .btn-primary {
+                width: 100%;
+                font-size: 14px;
+                padding: 8px;
+            }
+            .table th, .table td {
+                padding: 5px;
+                font-size: 12px;
+            }
+            .card-header h3 {
+                font-size: 16px;
+            }
+        }
+    </style>
 </head>
 <body class="hold-transition sidebar-mini layout-fixed">
     <div class="wrapper">
-
         <!-- Navbar -->
         {% include 'admin/navbar.html' %}
-
-        <!-- Main Sidebar Container -->
+        
+        <!-- Sidebar -->
         {% include 'admin/sidebar.html' %}
 
         <!-- Content Wrapper -->
@@ -23,7 +67,18 @@
                 <div class="container-fluid">
                     <div class="row mb-2">
                         <div class="col-sm-6">
-                            <h1>Daftar Absensi Kelas {{ kelas.nama_kelas }}</h1>
+                            <h1>Absensi Kelas {{ kelas.nama_kelas }}</h1>
+                        </div>
+                        <div class="col-sm-6">
+                            <!-- Pencarian berbasis tanggal -->
+                            <form method="GET" action="{{ url_for('lihat_absensi', kelas_id=kelas._id) }}" class="float-right">
+                                <div class="input-group">
+                                    <input type="date" class="form-control" name="tanggal" placeholder="Cari tanggal" required>
+                                    <div class="input-group-append">
+                                        <button class="btn btn-primary" type="submit">Cari</button>
+                                    </div>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -35,29 +90,50 @@
                     <!-- Card untuk daftar absensi -->
                     <div class="card">
                         <div class="card-header">
-                            <h3 class="card-title">Daftar Absensi Berdasarkan Tanggal</h3>
+                            <h3 class="card-title">Daftar Absensi</h3>
                         </div>
-                        <div class="card-body table-responsive">
-                            <table class="table table-bordered table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Tanggal</th>
-                                        <th>Jumlah Mahasiswa Hadir</th>
-                                        <th>Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for absensi in absensi_list %}
-                                    <tr>
-                                        <td>{{ absensi._id }}</td>  <!-- Tanggal sudah di-format -->
-                                        <td>{{ absensi.jumlah_hadir }}</td>
-                                        <td>
-                                            <a href="{{ url_for('lihat_detail_absensi', kelas_id=kelas._id, tanggal=absensi._id) }}" class="btn btn-primary">Lihat Detail</a>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>                                                                
-                            </table>
+                        <div class="row">
+                            <div class="col-sm-6"></div> <!-- Kosong untuk kiri -->
+                            <div class="col-sm-6 d-flex justify-content-end">
+                                <a href="{{ url_for('unduh_rekapitulasi_absensi', kelas_id=kelas._id) }}" class="btn btn-success">
+                                    <i class="fas fa-file-download"></i> Unduh Rekap
+                                </a>
+                            </div>
+                        </div>                        
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table id="absensiTable" class="table table-bordered table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>No</th>
+                                            <th>Tanggal</th>
+                                            <th>Hari</th>
+                                            <th>Waktu</th>
+                                            <th>Jumlah Hadir</th>
+                                            <th>Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for absensi in absensi_list %}
+                                        <tr>
+                                            <td>{{ loop.index }}</td>
+                                            <td>{{ absensi['waktu_mulai'].strftime('%d-%m-%Y') }}</td> <!-- Tampilkan tanggal -->
+                                            <td>{{ absensi['waktu_mulai'].strftime('%A') }}</td> <!-- Tampilkan hari -->
+                                            <td>{{ absensi['waktu_mulai'].strftime('%H:%M') }} - {{ absensi['waktu_selesai'].strftime('%H:%M') }}</td> <!-- Waktu mulai - selesai -->
+                                            <td>{{ absensi['mahasiswa_hadir'] | length }} dari {{ total_mahasiswa }} mahasiswa</td> <!-- Jumlah hadir dan total mahasiswa -->
+                                            <td>
+                                                <a href="{{ url_for('lihat_detail_absensi', kelas_id=kelas._id, absensi_id=absensi._id, tanggal=absensi['waktu_mulai'].strftime('%d-%m-%Y')) }}" class="btn btn-warning btn-sm">
+                                                    <i class="fas fa-eye"></i> Lihat Detail
+                                                </a>                                                
+                                                <a href="{{ url_for('unduh_laporan_absensi', kelas_id=kelas._id, absensi_id=absensi._id, tanggal=absensi['waktu_mulai'].strftime('%d-%m-%Y')) }}" class="btn btn-info btn-sm">
+                                                    <i class="fas fa-download"></i> Unduh
+                                                </a>                                                
+                                            </td>
+                                        </tr>
+                                        {% endfor %}                                    
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -68,9 +144,43 @@
         {% include 'admin/footer.html' %}
     </div>
 
-    <!-- Script JS AdminLTE -->
+    <!-- Scripts -->
     <script src="{{ url_for('static', filename='admin_lte/plugins/jquery/jquery.min.js') }}"></script>
     <script src="{{ url_for('static', filename='admin_lte/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin_lte/plugins/datatables/jquery.dataTables.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin_lte/plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin_lte/plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin_lte/plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
+
+    <!-- SweetAlert2 untuk Pesan Flash -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <script>
+        Swal.fire({
+            icon: '{% if messages[0][0] == "success" %}success{% else %}error{% endif %}',
+            title: 'Pemberitahuan',
+            text: '{{ messages[0][1] }}',
+            timer: 3000,
+            showConfirmButton: false
+        });
+    </script>
+    {% endif %}
+    {% endwith %}
+
+    <!-- Script untuk inisialisasi DataTable -->
+    <script>
+        $(function () {
+            $("#absensiTable").DataTable({
+                "responsive": true,
+                "autoWidth": false,
+                "searching": false,  // Nonaktifkan pencarian default DataTables
+                "paging": true,
+                "lengthChange": true
+            });
+        });
+    </script>
+
+    <!-- Script AdminLTE -->
     <script src="{{ url_for('static', filename='admin_lte/dist/js/adminlte.min.js') }}"></script>
 </body>
 </html>

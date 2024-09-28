@@ -1,11 +1,46 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Edit Mahasiswa</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/dist/css/adminlte.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/fontawesome-free/css/all.min.css') }}">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            border-color: #007bff;
+            font-weight: bold;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+            border-color: #004085;
+        }
+        .card-header {
+            background-color: #f8f9fa;
+        }
+        .form-group label {
+            font-weight: bold;
+        }
+
+        /* Mobile styles */
+        @media (max-width: 768px) {
+            .content-wrapper {
+                padding: 15px;
+            }
+            .btn-primary {
+                width: 100%; /* Full width button */
+                font-size: 14px;
+                padding: 8px;
+            }
+            .card-header h3 {
+                font-size: 16px;
+            }
+        }
+    </style>
 </head>
 <body class="hold-transition sidebar-mini layout-fixed">
     <div class="wrapper">
@@ -36,19 +71,9 @@
                         <div class="card-header">
                             <h3 class="card-title">Formulir Edit Mahasiswa</h3>
                         </div>
-
                         <!-- Form Start -->
                         <form action="{{ url_for('edit_mahasiswa', id=mahasiswa._id) }}" method="POST" enctype="multipart/form-data">
                             <div class="card-body">
-                                <!-- Pesan Flash -->
-                                {% with messages = get_flashed_messages(with_categories=true) %}
-                                    {% if messages %}
-                                        {% for category, message in messages %}
-                                            <div class="alert alert-{{ category }}">{{ message }}</div>
-                                        {% endfor %}
-                                    {% endif %}
-                                {% endwith %}
-                                
                                 <div class="form-group">
                                     <label for="nim">NIM</label>
                                     <input type="text" name="nim" class="form-control" id="nim" value="{{ mahasiswa.nim }}" required>
@@ -69,15 +94,8 @@
                                     <label for="foto_mahasiswa">Perbarui Foto Mahasiswa</label>
                                     <div class="input-group">
                                         <input type="file" class="form-control" id="foto_mahasiswa" name="foto_mahasiswa[]" multiple>
-                                        <div class="input-group-append">
-                                            <button type="submit" class="btn btn-primary">Upload</button>
-                                        </div>
                                     </div>
                                     <small class="form-text text-muted">Unggah minimal 10 foto untuk memperbarui model face recognition.</small>
-                                </div>
-                                <!-- Tombol training ulang -->
-                                <div class="form-group">
-                                    <button type="submit" class="btn btn-secondary" name="retrain">Training Ulang Model</button>
                                 </div>
                             </div>
                             <!-- /.card-body -->
@@ -86,7 +104,6 @@
                             </div>
                         </form>
                     </div>
-                    <!-- /.card -->
                 </div>
             </section>
         </div>
@@ -94,10 +111,27 @@
         <!-- Footer -->
         {% include 'admin/footer.html' %}
     </div>
-
-    <!-- Script JS AdminLTE -->
+    <!-- Script untuk SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+   
+    <!-- Script AdminLTE -->
     <script src="{{ url_for('static', filename='admin_lte/plugins/jquery/jquery.min.js') }}"></script>
     <script src="{{ url_for('static', filename='admin_lte/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
     <script src="{{ url_for('static', filename='admin_lte/dist/js/adminlte.min.js') }}"></script>
+
+           <!-- SweetAlert2 untuk Pesan Flash -->
+           {% with messages = get_flashed_messages(with_categories=true) %}
+           {% if messages %}
+               <script>
+                   Swal.fire({
+                       icon: '{% if messages[0][0] == "success" %}success{% else %}error{% endif %}',
+                       title: 'Pemberitahuan',
+                       text: '{{ messages[0][1] }}',
+                       timer: 3000,
+                       showConfirmButton: false
+                   });
+               </script>
+           {% endif %}
+       {% endwith %}
 </body>
 </html>

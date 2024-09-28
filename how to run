@@ -1,0 +1,12 @@
+cara menjalankan
+
+jalankan mongodb
+$mongod --dbpath ./db 
+
+buka di terminal baru
+aktifkan virtual enviroment python
+$source ./venv/bin/activate
+
+jalankan flask (pastikan sudah menginstall depedensi yang dibutuhkan)
+$python3 app.py
+

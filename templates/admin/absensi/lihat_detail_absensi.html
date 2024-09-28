@@ -1,19 +1,55 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Detail Absensi</title>
+    <title>Detail Absensi Kelas {{ kelas.nama_kelas }} untuk Tanggal {{ tanggal }}</title>
+    <!-- Link CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/dist/css/adminlte.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/fontawesome-free/css/all.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
+    
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+        }
+        .status-hadir {
+            background-color: #28a745;
+            color: white;
+            padding: 5px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .status-terlambat {
+            background-color: #ffc107;
+            color: white;
+            padding: 5px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .status-tidak-hadir {
+            background-color: #dc3545;
+            color: white;
+            padding: 5px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .table-responsive {
+            overflow-x: auto;
+        }
+        @media (max-width: 768px) {
+            .content-wrapper {
+                padding: 15px;
+            }
+        }
+    </style>
 </head>
 <body class="hold-transition sidebar-mini layout-fixed">
     <div class="wrapper">
-
         <!-- Navbar -->
         {% include 'admin/navbar.html' %}
-
-        <!-- Main Sidebar Container -->
+        
+        <!-- Sidebar -->
         {% include 'admin/sidebar.html' %}
 
         <!-- Content Wrapper -->
@@ -23,7 +59,7 @@
                 <div class="container-fluid">
                     <div class="row mb-2">
                         <div class="col-sm-6">
-                            <h1>Detail Absensi untuk Tanggal {{ tanggal }}</h1>
+                            <h1>Detail Absensi Kelas {{ kelas.nama_kelas }} untuk Tanggal {{ tanggal }}</h1>
                         </div>
                     </div>
                 </div>
@@ -32,32 +68,44 @@
             <!-- Main content -->
             <section class="content">
                 <div class="container-fluid">
-                    <!-- Card untuk daftar absensi -->
+                    <!-- Card untuk detail absensi -->
                     <div class="card">
                         <div class="card-header">
-                            <h3 class="card-title">Daftar Mahasiswa Hadir</h3>
+                            <h3 class="card-title">Detail Kehadiran Mahasiswa</h3>
                         </div>
-                        <div class="card-body table-responsive">
-                            <table class="table table-bordered table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>NIM</th>
-                                        <th>Nama</th>
-                                        <th>Status Kehadiran</th>
-                                        <th>Waktu Kehadiran</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for absensi in detail_absensi %}
-                                    <tr>
-                                        <td>{{ absensi.nim }}</td>
-                                        <td>{{ absensi.nama }}</td>
-                                        <td>{{ absensi.status }}</td>
-                                        <td>{{ absensi.waktu }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table id="detailAbsensiTable" class="table table-bordered table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>No</th>
+                                            <th>Nama</th>
+                                            <th>NIM</th>
+                                            <th>Waktu Kehadiran</th>
+                                            <th>Status Kehadiran</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for absensi in detail_absensi %}
+                                        <tr>
+                                            <td>{{ loop.index }}</td>
+                                            <td>{{ absensi['nama'] }}</td>
+                                            <td>{{ absensi['nim'] }}</td>
+                                            <td>{% if absensi['status'] == 'Tidak Hadir' %} - {% else %} {{ absensi['waktu'] }} {% endif %}</td>
+                                            <td>
+                                                {% if absensi['status'] == 'Hadir' %}
+                                                <span class="status-hadir">Hadir</span>
+                                                {% elif absensi['status'] == 'Terlambat' %}
+                                                <span class="status-terlambat">Terlambat</span>
+                                                {% else %}
+                                                <span class="status-tidak-hadir">Tidak Hadir</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>                                
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -68,9 +116,23 @@
         {% include 'admin/footer.html' %}
     </div>
 
-    <!-- Script JS AdminLTE -->
+    <!-- Scripts -->
     <script src="{{ url_for('static', filename='admin_lte/plugins/jquery/jquery.min.js') }}"></script>
     <script src="{{ url_for('static', filename='admin_lte/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='admin_lte/dist/js/adminlte.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin_lte/plugins/datatables/jquery.dataTables.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin_lte/plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin_lte/plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin_lte/plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
+
+    <script>
+        $(function () {
+            $("#detailAbsensiTable").DataTable({
+                "responsive": true,
+                "autoWidth": false,
+                "paging": true,
+                "lengthChange": true
+            });
+        });
+    </script>
 </body>
 </html>

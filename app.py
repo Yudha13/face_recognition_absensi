@@ -1,5 +1,5 @@
-from cProfile import label
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+import subprocess
+from flask import Flask, render_template, jsonify, request, redirect, url_for, session, flash
 from pymongo import MongoClient
 from config import MONGO_URI, DB_NAME, SECRET_KEY
 from bson.objectid import ObjectId
@@ -9,17 +9,23 @@ from datetime import datetime
 import os
 import shutil
 from werkzeug.utils import secure_filename
-from training.train_model import train_model  # Fungsi untuk training model
+from training.train_model import train_model  # panggil fungsi train
 from flask import session
 import threading
 import logging
-import cv2
+from bson import ObjectId
+import threading
+import locale
+import io
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
 
 client = MongoClient(MONGO_URI)
 db = client[DB_NAME]
+
+
+locale.setlocale(locale.LC_TIME, 'id_ID.UTF-8')  # Set locale Indonesia
 
 #########################################
 #Pada Bagian ini adalah rute untuk admin#
@@ -73,14 +79,18 @@ def admin_dashboard():
 #rute check status absensi
 @app.route('/check_absensi_status', methods=['GET'])
 def check_absensi_status():
-    # Ambil status kelas yang sedang berlangsung dari database
-    kelas_berlangsung = db.kelas.find_one({"kelas_berlangsung": True})
+    # Cari kelas yang statusnya sedang berlangsung
+    kelas_berlangsung = db.kelas.find_one({"status": "Berlangsung"})
 
     if kelas_berlangsung:
-        return {"status": "kelas_berlangsung", "nama_kelas": kelas_berlangsung["nama_kelas"]}
+        return {
+            "status": "kelas_berlangsung",
+            "nama_kelas": kelas_berlangsung["nama_kelas"],
+            "kelas_id": str(kelas_berlangsung["_id"])
+        }
     else:
         return {"status": "no_class"}
-    
+
 #######################################################################################################
 ## RUTE PENGELOLAAN MAHASISWA
 
@@ -108,8 +118,8 @@ def tambah_mahasiswa():
             existing_mahasiswa = db.mahasiswa.find_one({'nim': nim})
             if existing_mahasiswa:
                 flash(f'Mahasiswa dengan NIM {nim} sudah ada di database. Silakan gunakan NIM yang berbeda.', 'danger')
-                return render_template('admin/mahasiswa/tambah_mahasiswa.html')  # Tetap di halaman tambah mahasiswa
-            
+                return render_template('admin/mahasiswa/tambah_mahasiswa.html') 
+
             # Simpan data mahasiswa ke database
             mahasiswa = {
                 'nim': nim,
@@ -121,30 +131,21 @@ def tambah_mahasiswa():
             inserted_mahasiswa = db.mahasiswa.insert_one(mahasiswa)
             mahasiswa_id = str(inserted_mahasiswa.inserted_id)
 
-            # Hanya proses jika ada file yang diunggah dan valid
+            # Proses unggah foto jika ada
             if foto_mahasiswa and foto_mahasiswa[0].filename != '':
                 path = os.path.join('training/images', mahasiswa_id)
                 if not os.path.exists(path):
                     os.makedirs(path)
 
                 for foto in foto_mahasiswa:
-                    if foto and foto.filename != '':  # Pastikan foto valid
+                    if foto and foto.filename != '':
                         filename = secure_filename(foto.filename)
                         foto.save(os.path.join(path, filename))
 
-                # Mulai training jika ada minimal 10 foto
-                if len(foto_mahasiswa) >= 10:
-                    session['training_status'] = f"Training sedang berlangsung untuk mahasiswa NIM: {nim}"
-                    train_model(mahasiswa_id)  # Lakukan training model
-                    session['training_status'] = f"Training selesai untuk mahasiswa NIM: {nim}"
-                    db.mahasiswa.update_one({'_id': ObjectId(mahasiswa_id)}, {"$set": {"trained": True}})
-                    flash('Mahasiswa berhasil ditambahkan dan model berhasil di-train.', 'success')
-                else:
-                    flash('Mahasiswa berhasil ditambahkan, namun perlu upload minimal 10 foto untuk training.', 'warning')
+                flash('Mahasiswa berhasil ditambahkan. Foto telah diunggah dan siap untuk training.', 'success')
             else:
-                flash('Mahasiswa berhasil ditambahkan, namun tidak ada foto yang diunggah.', 'info')
+                flash('Mahasiswa berhasil ditambahkan. Tidak ada foto yang diunggah.', 'info')
 
-            # Redirect setelah POST untuk memunculkan flash message
             return redirect(url_for('kelola_mahasiswa'))
         return render_template('admin/mahasiswa/tambah_mahasiswa.html')
     else:
@@ -167,8 +168,8 @@ def edit_mahasiswa(id):
                 existing_mahasiswa = db.mahasiswa.find_one({'nim': nim, '_id': {'$ne': ObjectId(id)}})
                 if existing_mahasiswa:
                     flash(f'Mahasiswa dengan NIM {nim} sudah ada di database. Silakan gunakan NIM yang berbeda.', 'danger')
-                    return render_template('admin/mahasiswa/edit_mahasiswa.html', mahasiswa=mahasiswa)  # Tetap di halaman edit mahasiswa
-                
+                    return render_template('admin/mahasiswa/edit_mahasiswa.html', mahasiswa=mahasiswa)
+
                 # Update data mahasiswa di database
                 db.mahasiswa.update_one({'_id': ObjectId(id)}, {
                     "$set": {
@@ -179,7 +180,7 @@ def edit_mahasiswa(id):
                     }
                 })
 
-                # Proses unggah foto hanya jika ada file yang diunggah
+                # Proses unggah foto jika ada
                 if foto_mahasiswa and foto_mahasiswa[0].filename != '':
                     folder_path = os.path.join('training/images', str(mahasiswa['_id']))
 
@@ -189,27 +190,15 @@ def edit_mahasiswa(id):
 
                     # Simpan foto yang diunggah
                     for foto in foto_mahasiswa:
-                        filename = secure_filename(foto.filename)
-                        foto.save(os.path.join(folder_path, filename))
+                        if foto and foto.filename != '':
+                            filename = secure_filename(foto.filename)
+                            foto.save(os.path.join(folder_path, filename))
 
-                # Proses training ulang
-                if 'retrain' in request.form:
-                    folder_path = os.path.join('training/images', str(mahasiswa['_id']))
+                    flash('Data mahasiswa berhasil diperbarui. Foto telah diunggah dan siap untuk training.', 'success')
+                else:
+                    flash('Data mahasiswa berhasil diperbarui.', 'success')
 
-                    # Cek apakah folder berisi foto
-                    if not os.path.exists(folder_path) or len(os.listdir(folder_path)) < 10:
-                        flash('Training gagal. Tidak ada cukup foto untuk mahasiswa ini. Minimal 10 foto diperlukan.', 'danger')
-                    else:
-                        try:
-                            train_model(str(mahasiswa['_id']))
-                            db.mahasiswa.update_one({'_id': ObjectId(id)}, {"$set": {"trained": True}})
-                            flash('Training ulang berhasil.', 'success')
-                        except Exception as e:
-                            flash(f'Training ulang gagal: {str(e)}', 'danger')
-
-                flash('Data mahasiswa berhasil diperbarui.', 'success')
                 return redirect(url_for('kelola_mahasiswa'))
-
             return render_template('admin/mahasiswa/edit_mahasiswa.html', mahasiswa=mahasiswa)
         else:
             flash('Mahasiswa tidak ditemukan.', 'danger')
@@ -233,12 +222,15 @@ def train_mahasiswa(id):
             try:
                 # Update status di database
                 db.mahasiswa.update_one({'_id': ObjectId(id)}, {"$set": {"training_in_progress": True}})
+
+                nim = mahasiswa['nim']  # Ambil NIM dari data mahasiswa
+                index = 0  # Atur index sesuai logika aplikasi Anda, misalnya urutan mahasiswa di database
                 
-                # Jalankan training di thread terpisah
-                training_thread = threading.Thread(target=background_training, args=(str(mahasiswa['_id']),))
+                # Jalankan training di thread terpisah dengan nim dan index
+                training_thread = threading.Thread(target=background_training, args=(str(mahasiswa['_id']), folder_path, nim, index))
                 training_thread.start()
 
-                flash(f'Training sedang berlangsung untuk Mahasiswa ID {mahasiswa["_id"]}', 'info')
+                flash(f'Training sedang berlangsung untuk Mahasiswa NIM {nim}', 'info')
             except Exception as e:
                 flash(f'Training gagal: {str(e)}', 'danger')
 
@@ -250,14 +242,21 @@ def train_mahasiswa(id):
         return redirect(url_for('admin_login'))
 
 # Fungsi untuk menjalankan training di latar belakang
-def background_training(mahasiswa_id):
+def background_training(mahasiswa_id, folder_path, nim, index):
     try:
-        logging.info(f'Training dimulai untuk Mahasiswa ID {mahasiswa_id}')
-        train_model(mahasiswa_id)  # Fungsi training model
+        logging.info(f'Training dimulai untuk Mahasiswa ID {mahasiswa_id} dengan NIM {nim}')
+        train_model(mahasiswa_id, nim, index)  # Panggil fungsi training dengan nim dan index
         db.mahasiswa.update_one({'_id': ObjectId(mahasiswa_id)}, {"$set": {"trained": True, "training_in_progress": False}})
-        logging.info(f'Training selesai untuk Mahasiswa ID {mahasiswa_id}')
+        logging.info(f'Training selesai untuk Mahasiswa ID {mahasiswa_id}, NIM {nim}')
+
+        # Hapus folder yang berisi foto setelah training selesai
+        if os.path.exists(folder_path):
+            shutil.rmtree(folder_path)
+            logging.info(f'Folder foto di {folder_path} berhasil dihapus.')
+
     except Exception as e:
         logging.error(f'Training gagal untuk Mahasiswa ID {mahasiswa_id}: {str(e)}')
+        db.mahasiswa.update_one({'_id': ObjectId(mahasiswa_id)}, {"$set": {"training_in_progress": False}})
 
 # Endpoint untuk memeriksa status training secara real-time dengan progress
 @app.route('/check_all_training_status')
@@ -276,30 +275,31 @@ def hapus_mahasiswa(id):
     if 'admin_logged_in' in session:
         mahasiswa = db.mahasiswa.find_one({"_id": ObjectId(id)})
         if mahasiswa:
-            mahasiswa_id = str(mahasiswa['_id'])
+            nim = mahasiswa['nim']  # Pastikan NIM diambil dari data mahasiswa
 
             # Hapus data mahasiswa dari database
             db.mahasiswa.delete_one({"_id": ObjectId(id)})
             flash('Mahasiswa berhasil dihapus.', 'success')
 
             # Hapus foto dari folder training/images
-            image_path = os.path.join('training/images', mahasiswa_id)
+            image_path = os.path.join('training/images', str(mahasiswa['_id']))  # Gunakan ObjectId untuk path foto
             if os.path.exists(image_path):
                 shutil.rmtree(image_path)  # Hapus seluruh folder beserta foto
+                print(f"[INFO] Folder foto untuk mahasiswa ID {mahasiswa['_id']} berhasil dihapus.")
 
-            # Hapus model mahasiswa dari folder models
-            model_path = os.path.join('models', mahasiswa_id)
+            # Hapus model mahasiswa dari folder models menggunakan NIM
+            model_path = os.path.join('models', nim)  # Gunakan NIM untuk path model
             if os.path.exists(model_path):
                 shutil.rmtree(model_path)  # Hapus seluruh folder beserta model
-            
-            # Pastikan status 'trained' tidak aktif
-            db.mahasiswa.update_one({'_id': ObjectId(id)}, {"$set": {"trained": False}})
+                print(f"[INFO] Folder model untuk mahasiswa dengan NIM {nim} berhasil dihapus.")
 
             # Perbarui data kelas yang berhubungan dengan mahasiswa ini
             db.kelas.update_many({}, {"$pull": {"mahasiswa": ObjectId(id)}})
+            print(f"[INFO] Data kelas diperbarui, mahasiswa ID {mahasiswa['_id']} dihapus dari semua kelas.")
 
         else:
             flash('Mahasiswa tidak ditemukan.', 'danger')
+            print(f"[ERROR] Mahasiswa dengan ID {id} tidak ditemukan di database.")
 
         return redirect(url_for('kelola_mahasiswa'))
     else:
@@ -323,17 +323,28 @@ def tambah_dosen():
         if request.method == 'POST':
             username = request.form['username']
             password = request.form['password']
+            nidn = request.form['nidn']
             nama = request.form['nama']
             email = request.form['email']
             nomor_hp = request.form['nomor_hp']
+
+            # Cek apakah NIDN sudah ada
+            existing_dosen = db.dosen.find_one({"nidn": nidn})
+            if existing_dosen:
+                flash('NIDN sudah digunakan, masukkan NIDN yang berbeda.', 'danger')
+                return redirect(url_for('tambah_dosen'))
+
+            # Simpan dosen baru ke database
             db.dosen.insert_one({
                 "username": username,
                 "password": password,
+                "nidn": nidn,
                 "nama": nama,
                 "email": email,
                 "nomor_hp": nomor_hp
             })
-            return redirect(url_for('kelola_dosen'))
+            flash('Dosen berhasil ditambahkan.', 'success')  # Flash message sukses
+            return redirect(url_for('kelola_dosen'))  # Kembali ke halaman kelola dosen
         return render_template('admin/dosen/tambah_dosen.html')
     else:
         return redirect(url_for('admin_login'))
@@ -345,20 +356,37 @@ def edit_dosen(id):
         dosen = db.dosen.find_one({"_id": ObjectId(id)})
         if request.method == 'POST':
             username = request.form['username']
-            password = request.form['password']
+            password = request.form['password']  # Bisa kosong
+            nidn = request.form['nidn']
             nama = request.form['nama']
             email = request.form['email']
             nomor_hp = request.form['nomor_hp']
-            db.dosen.update_one({"_id": ObjectId(id)}, {
-                "$set": {
-                    "username": username,
-                    "password": password,
-                    "nama": nama,
-                    "email": email,
-                    "nomor_hp": nomor_hp
-                }
-            })
+
+            # Cek apakah NIDN sudah ada di dosen lain
+            existing_dosen = db.dosen.find_one({"nidn": nidn, "_id": {"$ne": ObjectId(id)}})
+            if existing_dosen:
+                flash('NIDN sudah digunakan, masukkan NIDN yang berbeda.', 'danger')
+                return redirect(url_for('edit_dosen', id=id))
+
+            # Update data dosen tanpa mengubah password jika password kosong
+            update_data = {
+                "username": username,
+                "nidn": nidn,
+                "nama": nama,
+                "email": email,
+                "nomor_hp": nomor_hp
+            }
+
+            # Hanya update password jika diisi
+            if password:
+                update_data["password"] = password  # Tambahkan peng-hash-an jika perlu
+
+            # Update data dosen
+            db.dosen.update_one({"_id": ObjectId(id)}, {"$set": update_data})
+
+            flash('Dosen berhasil diperbarui.', 'success')
             return redirect(url_for('kelola_dosen'))
+
         return render_template('admin/dosen/edit_dosen.html', dosen=dosen)
     else:
         return redirect(url_for('admin_login'))
@@ -528,9 +556,10 @@ def hapus_kelas(id):
     if 'admin_logged_in' in session:
         # Hapus kelas berdasarkan ID
         db.kelas.delete_one({"_id": ObjectId(id)})
+        db.absensi.delete_many({"kelas_id": ObjectId(id)})
 
         # Kirim pesan flash untuk konfirmasi penghapusan
-        flash('Kelas berhasil dihapus.', 'success')
+        flash('Kelas dan data absensinya berhasil dihapus.', 'success')
 
         # Redirect kembali ke halaman kelola kelas
         return redirect(url_for('kelola_kelas'))
@@ -599,100 +628,276 @@ def laporan_absensi():
     else:
         return redirect(url_for('admin_login'))
 
-#rute lihat absensi
+# Rute lihat absensi
 @app.route('/admin/lihat_absensi/<kelas_id>')
 def lihat_absensi(kelas_id):
     if 'admin_logged_in' in session:
         # Ambil data absensi berdasarkan kelas yang dipilih
-        absensi_list = list(db.absensi.aggregate([
+        absensi_list = list(db.absensi.find(
+            {'kelas_id': ObjectId(kelas_id)},  # Filter absensi berdasarkan kelas_id
             {
-                '$match': {
-                    'kelas_id': ObjectId(kelas_id)
-                }
-            },
-            {
-                '$group': {
-                    '_id': {'$dateToString': { 'format': '%d-%m-%Y', 'date': '$waktu' }},  # Ekstrak tanggal dari waktu
-                    'jumlah_hadir': {'$sum': 1}
-                }
+                'waktu_mulai': 1,
+                'waktu_selesai': 1,
+                'mahasiswa_hadir': 1
             }
-        ]))
+        ))
 
+        # Ambil data kelas untuk menghitung total mahasiswa
         kelas = db.kelas.find_one({"_id": ObjectId(kelas_id)})
+        total_mahasiswa = len(kelas['mahasiswa'])  # Hitung total mahasiswa yang terdaftar di kelas
 
-        return render_template('admin/absensi/lihat_absensi.html', absensi_list=absensi_list, kelas=kelas)
+        # Kirim data absensi dan total_mahasiswa ke template
+        return render_template('admin/absensi/lihat_absensi.html', absensi_list=absensi_list, kelas=kelas, total_mahasiswa=total_mahasiswa)
     else:
         return redirect(url_for('admin_login'))
 
 #rute detail absensi
-@app.route('/admin/lihat_detail_absensi/<kelas_id>/<tanggal>')
-def lihat_detail_absensi(kelas_id, tanggal):
+@app.route('/admin/lihat_detail_absensi/<kelas_id>/<absensi_id>')
+def lihat_detail_absensi(kelas_id, absensi_id):
     if 'admin_logged_in' in session:
-        from datetime import datetime
-        try:
-            # Parse tanggal dengan format yang sesuai
-            tanggal_awal = datetime.strptime(tanggal, '%d-%m-%Y')
-            tanggal_akhir = tanggal_awal.replace(hour=23, minute=59, second=59)
-        except ValueError:
-            flash("Format tanggal tidak valid", "danger")
-            return redirect(url_for('laporan_absensi'))
+        # Ambil data absensi berdasarkan ID absensi yang dipilih
+        absensi = db.absensi.find_one({
+            '_id': ObjectId(absensi_id),
+            'kelas_id': ObjectId(kelas_id)
+        })
 
-        # Ambil data absensi untuk kelas_id dan tanggal yang sesuai
-        absensi_list = list(db.absensi.find({
-            'kelas_id': ObjectId(kelas_id),
-            'waktu': {'$gte': tanggal_awal, '$lte': tanggal_akhir}
-        }))
-
-        if not absensi_list:
-            flash("Tidak ada absensi ditemukan untuk tanggal ini", "danger")
+        if not absensi:
+            flash("Data absensi tidak ditemukan untuk sesi ini", "danger")
             return redirect(url_for('lihat_absensi', kelas_id=kelas_id))
 
-        # Ambil data mahasiswa yang hadir pada absensi tersebut
-        mahasiswa_ids = list(set(ObjectId(absensi['mahasiswa_id']) for absensi in absensi_list))
-        mahasiswa_list = list(db.mahasiswa.find({"_id": {"$in": mahasiswa_ids}}, {'nama': 1, 'nim': 1}))
+        # Ambil seluruh mahasiswa di kelas tersebut
+        kelas = db.kelas.find_one({"_id": ObjectId(kelas_id)})
+        mahasiswa_list = list(db.mahasiswa.find({"_id": {"$in": kelas['mahasiswa']}}, {'nama': 1, 'nim': 1}))
 
-        # Gabungkan data absensi dan mahasiswa untuk ditampilkan
+        # Siapkan data absensi dengan status kehadiran
         detail_absensi = []
-        for absensi in absensi_list:
-            mahasiswa = next((mhs for mhs in mahasiswa_list if str(mhs['_id']) == absensi['mahasiswa_id']), None)
-            if mahasiswa:
+        hadir_ids = {str(hadir['mahasiswa_id']) for hadir in absensi['mahasiswa_hadir']}
+
+        for mahasiswa in mahasiswa_list:
+            mahasiswa_id_str = str(mahasiswa['_id'])
+            if mahasiswa_id_str in hadir_ids:
+                hadir_mahasiswa = next(
+                    (hadir for hadir in absensi['mahasiswa_hadir'] if str(hadir['mahasiswa_id']) == mahasiswa_id_str),
+                    {}
+                )
                 detail_absensi.append({
                     'nama': mahasiswa['nama'],
-                    'nim': mahasiswa.get('nim', 'N/A'),  # NIM jika ada, jika tidak tampilkan 'N/A'
-                    'status': absensi['status'],
-                    'waktu': absensi['waktu'].strftime('%d-%m-%Y %H:%M:%S')
+                    'nim': mahasiswa['nim'],
+                    'status': 'Terlambat' if hadir_mahasiswa.get('terlambat', False) else 'Hadir',
+                    'waktu': hadir_mahasiswa['waktu_hadir'].strftime('%H:%M:%S')  # Hanya menampilkan waktu hadir
+                })
+            else:
+                detail_absensi.append({
+                    'nama': mahasiswa['nama'],
+                    'nim': mahasiswa['nim'],
+                    'status': 'Tidak Hadir',
+                    'waktu': '-'  # Tidak hadir tidak memiliki waktu hadir
                 })
 
-        return render_template('admin/absensi/lihat_detail_absensi.html', detail_absensi=detail_absensi, tanggal=tanggal, kelas_id=kelas_id)
+        # Format tanggal absensi
+        tanggal = absensi['waktu_mulai'].strftime('%d-%m-%Y')
+
+        # Kirim data absensi, kelas, dan tanggal ke template HTML
+        return render_template('admin/absensi/lihat_detail_absensi.html', detail_absensi=detail_absensi, kelas=kelas, absensi=absensi, tanggal=tanggal)
     else:
         return redirect(url_for('admin_login'))
 
-#mengunduh laporan absensi
-@app.route('/admin/unduh_laporan_absensi')
-def unduh_laporan_absensi():
+#laporan per sesi
+@app.route('/admin/unduh_laporan_absensi/<absensi_id>')
+def unduh_laporan_absensi(absensi_id):
     if 'admin_logged_in' in session:
-        laporan_absensi = list(db.absensi.find())
+        # Ambil data absensi berdasarkan ID
+        absensi = db.absensi.find_one({"_id": ObjectId(absensi_id)})
 
-        # Membuat DataFrame untuk laporan absensi
+        if not absensi:
+            flash("Absensi tidak ditemukan", "danger")
+            return redirect(url_for('laporan_absensi'))
+
+        # Ambil informasi kelas
+        kelas = db.kelas.find_one({"_id": absensi['kelas_id']})
+        dosen = db.dosen.find_one({"_id": kelas['dosen_pengampu']})
+
+        # Ambil semua mahasiswa yang terdaftar di kelas tersebut
+        mahasiswa_list = list(db.mahasiswa.find({"_id": {"$in": kelas['mahasiswa']}}))
+        mahasiswa_dict = {str(mhs['_id']): mhs for mhs in mahasiswa_list}
+
+        # Siapkan data absensi per mahasiswa
+        absensi_data = {}
+        waktu_mulai = absensi['waktu_mulai'].strftime('%H:%M:%S')
+        waktu_selesai = absensi.get('waktu_selesai', 'N/A').strftime('%H:%M:%S') if absensi.get('waktu_selesai') else 'N/A'
+
+        # Loop melalui absensi mahasiswa yang hadir di sesi ini
+        for hadir in absensi['mahasiswa_hadir']:
+            mahasiswa_id = hadir['mahasiswa_id']
+            absensi_data[mahasiswa_id] = {
+                'terlambat': hadir['terlambat'],
+                'waktu_hadir': hadir['waktu_hadir'].strftime('%H:%M:%S')
+            }
+
+        # Siapkan data untuk laporan
         data = []
-        for absensi in laporan_absensi:
+        for mhs_id, mhs_data in mahasiswa_dict.items():
+            if mhs_id in absensi_data:
+                status_kehadiran = "Terlambat" if absensi_data[mhs_id]['terlambat'] else "Hadir"
+                waktu_hadir = absensi_data[mhs_id]['waktu_hadir']
+            else:
+                status_kehadiran = "Tidak Hadir"
+                waktu_hadir = "N/A"
+
             data.append({
-                "Tanggal": absensi['tanggal'],
-                "Nama Kelas": absensi['nama_kelas'],
-                "Nama Mahasiswa": absensi['nama_mahasiswa'],
-                "Status Kehadiran": absensi['status']
+                "NIM": mhs_data['nim'],
+                "Nama Mahasiswa": mhs_data['nama'],
+                "Status Kehadiran": status_kehadiran,
+                "Waktu Kehadiran": waktu_hadir
             })
-        
+
+        # Buat DataFrame dari data
         df = pd.DataFrame(data)
 
-        # Menyimpan DataFrame ke file Excel
-        file_path = "/tmp/laporan_absensi.xlsx"
-        df.to_excel(file_path, index=False)
+        # Simpan ke file Excel
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            workbook = writer.book
+            worksheet = workbook.add_worksheet('Absensi Sesi')
 
-        return send_file(file_path, as_attachment=True)
+            # Format header
+            header_format = workbook.add_format({'bold': True, 'align': 'center', 'bg_color': '#d9ead3'})
+            merge_format = workbook.add_format({'bold': True, 'align': 'center', 'valign': 'vcenter'})
+            time_format = workbook.add_format({'align': 'center'})
+            border_format = workbook.add_format({'border': 1})
+
+            # Tulis header laporan (Merge cells)
+            tanggal_absensi = absensi['waktu_mulai'].strftime('%d-%m-%Y')
+            worksheet.merge_range('A1:D1', f"Absensi Kelas {kelas['nama_kelas']} Tanggal {tanggal_absensi}", merge_format)
+            worksheet.merge_range('A2:D2', f"Dosen: {dosen['nama']}     Jadwal: {kelas['jam_mulai']} - {kelas['jam_selesai']}", merge_format)
+            worksheet.merge_range('A3:D3', f"Proses Absensi: {waktu_mulai} - {waktu_selesai}", merge_format)
+
+            # Tulis header tabel
+            worksheet.write(4, 0, "No", header_format)
+            worksheet.write(4, 1, "NIM", header_format)
+            worksheet.write(4, 2, "Nama Mahasiswa", header_format)
+            worksheet.write(4, 3, "Status Kehadiran", header_format)
+            worksheet.write(4, 4, "Waktu Kehadiran", header_format)
+
+            # Tulis data absensi
+            for idx, row in enumerate(df.itertuples(), start=1):
+                worksheet.write(idx + 4, 0, idx, border_format)
+                worksheet.write(idx + 4, 1, row.NIM, border_format)
+                worksheet.write(idx + 4, 2, row._2, border_format)  # Nama Mahasiswa
+                worksheet.write(idx + 4, 3, row._3, border_format)  # Status Kehadiran
+                worksheet.write(idx + 4, 4, row._4, border_format)  # Waktu Kehadiran
+
+        output.seek(0)
+
+        return send_file(output, download_name=f'Absensi_{kelas["nama_kelas"]}_{tanggal_absensi}.xlsx', as_attachment=True)
     else:
         return redirect(url_for('admin_login'))
 
+# Fungsi untuk menghitung persentase kehadiran
+def hitung_persentase_kehadiran(hadir_list, total_sesi):
+    hadir_count = len([h for h in hadir_list if h in ["Hadir", "Terlambat"]])
+    return (hadir_count / total_sesi) * 100 if total_sesi > 0 else 0
+
+# Rute untuk unduh rekapitulasi absensi
+@app.route('/admin/unduh_rekapitulasi_absensi/<kelas_id>')
+def unduh_rekapitulasi_absensi(kelas_id):
+    if 'admin_logged_in' in session:
+        # Ambil informasi kelas
+        kelas = db.kelas.find_one({"_id": ObjectId(kelas_id)})
+        dosen = db.dosen.find_one({"_id": kelas['dosen_pengampu']})
+        absensi_list = db.absensi.find({'kelas_id': ObjectId(kelas_id)})
+
+        # Siapkan data header untuk kelas
+        kelas_info = [
+            ['Nama Kelas:', kelas['nama_kelas']],
+            ['Dosen Pengampu:', dosen['nama']],
+            ['Jadwal:', f"{kelas['hari']} {kelas['jam_mulai']} - {kelas['jam_selesai']}"]
+        ]
+
+        # Ambil daftar mahasiswa
+        mahasiswa_list = list(db.mahasiswa.find({"_id": {"$in": kelas['mahasiswa']}}))
+        mahasiswa_dict = {str(mhs['_id']): mhs for mhs in mahasiswa_list}
+
+        # Siapkan tanggal sesi dan kehadiran mahasiswa
+        tanggal_list = []
+        data_dict = {str(mhs['_id']): [] for mhs in mahasiswa_list}
+
+        for absensi in absensi_list:
+            tanggal = absensi['waktu_mulai'].strftime('%d-%m-%Y')
+            tanggal_list.append(tanggal)
+            for mhs_id in kelas['mahasiswa']:
+                hadir = next((hadir for hadir in absensi['mahasiswa_hadir'] if hadir['mahasiswa_id'] == str(mhs_id)), None)
+                nim = mahasiswa_dict[str(mhs_id)]['nim']
+                if hadir:
+                    if hadir['terlambat']:
+                        data_dict[str(mhs_id)].append('Terlambat')
+                    else:
+                        data_dict[str(mhs_id)].append('Hadir')
+                else:
+                    data_dict[str(mhs_id)].append('Tidak Hadir')
+
+        # Tambahkan kolom persentase kehadiran tanpa warna
+        for mhs_id, kehadiran_list in data_dict.items():
+            total_hadir = kehadiran_list.count('Hadir') + kehadiran_list.count('Terlambat')
+            total_sesi = len(tanggal_list)
+            persentase = (total_hadir / total_sesi) * 100 if total_sesi > 0 else 0
+            data_dict[mhs_id].append(f"{persentase:.2f}%")
+
+        # Buat DataFrame dengan sesi absensi sebagai kolom dan mahasiswa sebagai baris
+        df = pd.DataFrame(data_dict, index=tanggal_list + ['Persentase']).T
+
+        # Simpan ke Excel di memory
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            workbook = writer.book
+            worksheet = workbook.add_worksheet('Rekap Absensi')
+
+            # Format header dan tabel
+            header_format = workbook.add_format({'bold': True, 'align': 'center', 'bg_color': '#d9ead3', 'border': 1})
+            hadir_format = workbook.add_format({'bg_color': '#b6d7a8', 'border': 1})
+            terlambat_format = workbook.add_format({'bg_color': '#f9cb9c', 'border': 1})
+            tidak_hadir_format = workbook.add_format({'bg_color': '#e06666', 'border': 1})
+            nomor_format = workbook.add_format({'align': 'center', 'valign': 'vcenter', 'border': 1})
+
+            # Tulis informasi kelas di atas tabel tanpa border
+            worksheet.write('A1', f"Daftar Hadir Kelas {kelas['nama_kelas']}")
+            worksheet.write('A2', 'Dosen:')
+            worksheet.merge_range('B2:D2', dosen['nama'])
+            worksheet.write('A3', 'Jadwal:')
+            worksheet.merge_range('B3:D3', f"{kelas['hari']} {kelas['jam_mulai']} - {kelas['jam_selesai']}")
+
+            # Jarak tabel dari informasi kelas
+            row_offset = len(kelas_info) + 2
+
+            # Tulis header tabel dengan jarak ke bawah
+            worksheet.write(row_offset, 0, "No", header_format)
+            worksheet.write(row_offset, 1, "NIM", header_format)
+            worksheet.write(row_offset, 2, "Nama Mahasiswa", header_format)
+            for col_num, col_name in enumerate(tanggal_list):
+                worksheet.write(row_offset, col_num + 3, col_name, header_format)
+            worksheet.write(row_offset, len(tanggal_list) + 3, "Persentase Kehadiran", header_format)
+
+            # Tulis daftar mahasiswa dan data absensi
+            for row_num, (mhs_id, row_data) in enumerate(df.iterrows()):
+                worksheet.write(row_offset + row_num + 1, 0, row_num + 1, nomor_format)  # No
+                worksheet.write(row_offset + row_num + 1, 1, mahasiswa_dict[mhs_id]['nim'], nomor_format)  # NIM
+                worksheet.write(row_offset + row_num + 1, 2, mahasiswa_dict[mhs_id]['nama'], nomor_format)  # Nama Mahasiswa
+                for col_num, cell_value in enumerate(row_data[:-1]):  # Kolom terakhir adalah persentase, tidak ada warna
+                    if cell_value == 'Hadir':
+                        worksheet.write(row_offset + row_num + 1, col_num + 3, cell_value, hadir_format)
+                    elif cell_value == 'Terlambat':
+                        worksheet.write(row_offset + row_num + 1, col_num + 3, cell_value, terlambat_format)
+                    else:
+                        worksheet.write(row_offset + row_num + 1, col_num + 3, cell_value, tidak_hadir_format)
+                # Tulis persentase kehadiran tanpa warna
+                worksheet.write(row_offset + row_num + 1, len(tanggal_list) + 3, row_data[-1], nomor_format)
+
+        # Setelah selesai menulis, pindahkan posisi pointer ke awal
+        output.seek(0)
+
+        return send_file(output, download_name=f'Rekapitulasi_Absensi_Kelas_{kelas["nama_kelas"]}.xlsx', as_attachment=True)
+    else:
+        return redirect(url_for('admin_login'))
 
 #########################################
 #Pada Bagian ini adalah rute untuk dosen#
@@ -833,174 +1038,63 @@ def dosen_unduh_absensi():
     else:
         return redirect(url_for('dosen_login'))
 
-#########################
-#FUNGSI FACE RECOGNITION#
-#########################
+# rute start dan stop absensi
 
-# Inisialisasi variabel flag global untuk menghentikan loop kamera
-running = False
-capture = None  # Tambahkan variabel capture global agar bisa diakses dari berbagai fungsi
+# variabel global rute absensi
+face_recognition_process = None
 
-# Fungsi untuk proses absensi
-def start_class(kelas_id):
-    global running, capture
-    running = True
-    print(f"Memulai absensi untuk kelas {kelas_id}")
-
-    capture = cv2.VideoCapture(0)
-    if not capture.isOpened():
-        print("Kamera tidak bisa dibuka")
-        return
-
-    # Buat jendela kamera dengan opsi fleksibel
-    cv2.namedWindow('Camera', cv2.WINDOW_NORMAL)
-    cv2.resizeWindow('Camera', 640, 480)
-
-    # Path ke file haarcascade dan model
-    face_cascade = cv2.CascadeClassifier('utils/haarcascade_frontalface_default.xml')
-
-    # Ambil mahasiswa yang terdaftar di kelas ini
-    kelas = db.kelas.find_one({"_id": ObjectId(kelas_id)})
-    mahasiswa_ids = kelas['mahasiswa']
-    mahasiswa_list = db.mahasiswa.find({"_id": {"$in": mahasiswa_ids}})
-    
-    # Cache model mahasiswa untuk menghindari loading berulang
-    recognizer_dict = {}
-    id_to_mahasiswa = {}  # Mapping dari label ke Mahasiswa ID
-    for index, mahasiswa in enumerate(mahasiswa_list):
-        mahasiswa_id = str(mahasiswa['_id'])  # Menggunakan ObjectId sebagai string
-        model_path = os.path.join('models', mahasiswa_id, f'{mahasiswa_id}_model.yml')
-        if os.path.exists(model_path):
-            recognizer = cv2.face.LBPHFaceRecognizer_create()
-            recognizer.read(model_path)
-            recognizer_dict[index] = recognizer  # Gunakan index sebagai label
-            id_to_mahasiswa[index] = mahasiswa_id  # Mapping label (index) ke Mahasiswa ID
-            print(f"Model untuk Mahasiswa ID {mahasiswa_id} berhasil dimuat.")  # Log untuk model yang dimuat
-
-    # Set untuk menyimpan Mahasiswa ID yang sudah terdaftar hadir
-    hadir_set = set()
-
-    while running:  # Loop berdasarkan flag running
-        ret, frame = capture.read()
-
-        if not ret:
-            print("[ERROR] Tidak dapat membaca frame dari kamera")
-            break
-
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=6, minSize=(40, 40))
-
-        if len(faces) == 0:
-            print("[INFO] Tidak ada wajah terdeteksi pada frame ini.")
-        
-        for (x, y, w, h) in faces:
-            face_roi = gray[y:y+h, x:x+w]
-
-            # Kotak merah default untuk wajah yang tidak dikenali
-            color = (0, 0, 255)  # Merah
-
-            # Loop melalui semua mahasiswa untuk memproses model masing-masing
-            recognized = False  # Flag untuk menandai apakah wajah dikenali
-            for label, recognizer in recognizer_dict.items():
-                predicted_label, confidence = recognizer.predict(face_roi)
-
-                # Validasi label yang dihasilkan dan confidence
-                if confidence < 80 and predicted_label == label:  # Cocokkan label dengan index yang benar
-                    mahasiswa_id = id_to_mahasiswa[label]  # Ambil Mahasiswa ID berdasarkan label
-
-                    if label not in hadir_set:
-                        print(f"[INFO] Wajah dengan ID {mahasiswa_id} dikenali dengan confidence {confidence}")
-
-                        # Tandai bahwa wajah terdeteksi
-                        color = (0, 255, 0)  # Hijau untuk wajah yang sudah hadir
-                        cv2.putText(frame, f"ID: {mahasiswa_id}", (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)
-                        cv2.putText(frame, "Hadir", (x, y+h+30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)
-
-                        # Simpan absensi dengan informasi kelas jika belum tercatat
-                        db.absensi.insert_one({
-                            'mahasiswa_id': mahasiswa_id,
-                            'kelas_id': ObjectId(kelas_id),  # Tambahkan ID kelas
-                            'waktu': datetime.now(),
-                            'status': 'Hadir'
-                        })
-                        print(f"[INFO] Mahasiswa ID {mahasiswa_id} ditambahkan ke database sebagai 'Hadir'.")  # Log ke database
-                        
-                        # Tambahkan ID ke set hadir untuk menghindari pencatatan ganda
-                        hadir_set.add(label)
-                    else:
-                        print(f"[INFO] Wajah dengan ID {mahasiswa_id} sudah terdeteksi sebagai hadir.")
-                        color = (0, 255, 0)  # Tetap hijau jika sudah hadir
-                        cv2.putText(frame, f"ID: {mahasiswa_id}", (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)
-                        cv2.putText(frame, "Sudah Hadir", (x, y+h+30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)
-
-                    recognized = True
-                    break
-
-            if not recognized:
-                # Jika wajah dikenali tapi bukan dari kelas ini
-                if confidence < 80:
-                    color = (255, 0, 0)  # Biru untuk wajah yang bukan dari kelas ini
-                    cv2.putText(frame, "Bukan dari kelas ini", (x, y+h+30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 0), 2)
-
-            # Gambar kotak sesuai hasil deteksi
-            cv2.rectangle(frame, (x, y), (x+w, y+h), color, 2)
-
-        # Tampilkan frame di jendela kamera
-        cv2.imshow('Camera', frame)
-
-        # Periksa apakah jendela perlu diubah ukuran secara manual
-        if cv2.getWindowProperty('Camera', cv2.WND_PROP_VISIBLE) < 1:
-            break
-
-        # Keluar dari loop jika tombol 'q' ditekan
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-
-    capture.release()
-    cv2.destroyAllWindows()
-    print("[INFO] Proses absensi kelas dihentikan.")
-
-# Route untuk memulai kelas oleh admin
+# Route untuk memulai absensi oleh admin
 @app.route('/admin/start_kelas/<kelas_id>', methods=['POST'])
 def start_kelas(kelas_id):
-    if 'admin_logged_in' in session:
-        kelas = db.kelas.find_one({"_id": ObjectId(kelas_id)})
+    global face_recognition_process
 
-        if kelas:
-            # Tandai bahwa kelas sedang berlangsung
-            db.kelas.update_one({"_id": ObjectId(kelas_id)}, {"$set": {"kelas_berlangsung": True}})
-            
-            # Mulai proses absensi untuk seluruh mahasiswa dalam satu kelas
-            threading.Thread(target=start_class, args=(kelas_id,)).start()  # Mulai kelas untuk semua mahasiswa di kelas
-            
-            flash(f"Kelas {kelas['nama_kelas']} dimulai.", "success")
-        else:
-            flash("Kelas tidak ditemukan.", "danger")
+    kelas = db.kelas.find_one({"_id": ObjectId(kelas_id)})
 
-        return redirect(url_for('kelola_kelas'))
-    else:
-        return redirect(url_for('admin_login'))
+    # Periksa jika tidak ada mahasiswa
+    if not kelas['mahasiswa']:
+        return jsonify({"success": False, "message": "Tidak ada mahasiswa di kelas ini"})
 
-# Route untuk menghentikan kelas
-@app.route('/stop_class', methods=['POST'])
-def stop_class():
-    global running, capture
-    running = False  # Atur flag running menjadi False untuk menghentikan loop kamera
+    # Hentikan proses face recognition sebelumnya jika ada
+    if face_recognition_process and face_recognition_process.poll() is None:
+        face_recognition_process.terminate()
+        face_recognition_process.wait()
 
-    # Hentikan kamera jika masih terbuka di thread
-    try:
-        if capture and capture.isOpened():
-            capture.release()
-        cv2.destroyAllWindows()
+    # Jalankan subprocess untuk face recognition
+    face_recognition_process = subprocess.Popen(['python3', 'face_recognition.py', str(kelas_id)])
 
-        # Update status kelas di database menjadi tidak berlangsung
-        db.kelas.update_many({}, {"$set": {"kelas_berlangsung": False}})
-        
-        return {"success": True, "message": "Kelas berhasil dihentikan."}
-    except Exception as e:
-        return {"success": False, "message": f"Terjadi kesalahan: {str(e)}"}
+    # Update status kelas di MongoDB
+    waktu_mulai_absensi = datetime.now()
+    db.kelas.update_one({"_id": ObjectId(kelas_id)}, {"$set": {"status": "Berlangsung", "waktu_mulai_absensi": waktu_mulai_absensi}})
+
+    return jsonify({"success": True, "message": f"Kelas {kelas['nama_kelas']} dimulai."})
+
+# Route untuk menghentikan absensi
+@app.route('/admin/stop_kelas/<kelas_id>', methods=['POST'])
+def stop_kelas(kelas_id):
+    global face_recognition_process
+
+    print(f"Kelas ID yang diterima: {kelas_id}")
+
+    # Jika ada proses face recognition yang berjalan, hentikan prosesnya
+    if face_recognition_process is not None and face_recognition_process.poll() is None:
+        face_recognition_process.terminate()
+        face_recognition_process.wait()
+        face_recognition_process = None
+        print("Proses face recognition dihentikan.")
+
+    # Update status kelas dan absensi di MongoDB
+    waktu_selesai_absensi = datetime.now()
+    db.absensi.update_one(
+        {"kelas_id": ObjectId(kelas_id), "status": "Berlangsung"},
+        {"$set": {"status": "Tidak Berlangsung", "waktu_selesai": waktu_selesai_absensi}}
+    )
+    db.kelas.update_one(
+        {"_id": ObjectId(kelas_id)},
+        {"$set": {"status": "Tidak Berlangsung"}}
+    )
+
+    return jsonify({"success": True, "message": f"Proses face recognition untuk kelas {kelas_id} dihentikan."})
 
 if __name__ == '__main__':
     app.run(debug=True)
-
 

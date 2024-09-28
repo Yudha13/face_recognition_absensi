@@ -6,49 +6,95 @@
     <title>Kelola Dosen</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/dist/css/adminlte.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/fontawesome-free/css/all.min.css') }}">
-
-    <!-- SweetAlert2 CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            border-color: #007bff;
+            font-weight: bold;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+            border-color: #004085;
+        }
+        .card-header {
+            background-color: #f8f9fa;
+        }
+        .table th, .table td {
+            vertical-align: middle;
+            text-align: center;
+        }
+        .badge {
+            font-size: 14px;
+        }
+        .table-responsive {
+            overflow-x: auto;
+        }
+
+        /* Tombol dan tabel mobile */
+        @media (max-width: 768px) {
+            .content-wrapper {
+                padding: 15px;
+            }
+            .btn-primary {
+                width: 100%; /* Buat tombol full width di mobile */
+                font-size: 14px;
+                padding: 8px;
+            }
+            .table th, .table td {
+                padding: 5px; /* Kurangi padding di tabel untuk mobile */
+                font-size: 12px;
+            }
+            .card-header h3 {
+                font-size: 16px;
+            }
+        }
+    </style>
 </head>
 <body class="hold-transition sidebar-mini layout-fixed">
     <div class="wrapper">
-
         <!-- Navbar -->
         {% include 'admin/navbar.html' %}
-
-        <!-- Sidebar -->
+        
+        <!-- Main Sidebar Container -->
         {% include 'admin/sidebar.html' %}
 
         <!-- Content Wrapper -->
         <div class="content-wrapper">
-            <!-- Content Header -->
             <section class="content-header">
                 <div class="container-fluid">
                     <div class="row mb-2">
                         <div class="col-sm-6">
                             <h1>Kelola Dosen</h1>
                         </div>
+                        <div class="col-sm-6">
+                            <a href="{{ url_for('tambah_dosen') }}" class="btn btn-primary float-right">
+                                <i class="fas fa-plus"></i> Tambah Dosen
+                            </a>
+                        </div>
                     </div>
                 </div>
             </section>
 
-            <!-- Main content -->
             <section class="content">
                 <div class="container-fluid">
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title">Daftar Dosen</h3>
-                            <a href="{{ url_for('tambah_dosen') }}" class="btn btn-primary float-right">Tambah Dosen</a>
                         </div>
 
-                        <!-- Table displaying dosen data, make the table responsive -->
                         <div class="card-body">
                             <div class="table-responsive">
                                 <table id="dosenTable" class="table table-bordered table-striped">
                                     <thead>
                                         <tr>
                                             <th>No</th>
-                                            <th>Username</th>
+                                            <th>NIDN</th>
                                             <th>Nama</th>
                                             <th>Email</th>
                                             <th>Nomor HP</th>
@@ -59,15 +105,19 @@
                                         {% for dosen in dosen %}
                                         <tr>
                                             <td>{{ loop.index }}</td>
-                                            <td>{{ dosen.username }}</td>
+                                            <td>{{ dosen.nidn }}</td>
                                             <td>{{ dosen.nama }}</td>
                                             <td>{{ dosen.email }}</td>
                                             <td>{{ dosen.nomor_hp }}</td>
                                             <td>
-                                                <a href="{{ url_for('edit_dosen', id=dosen._id) }}" class="btn btn-warning btn-sm">Edit</a>
-
-                                                <!-- Tombol Hapus dengan SweetAlert2 -->
-                                                <button class="btn btn-danger btn-sm" onclick="confirmDelete('{{ url_for('hapus_dosen', id=dosen._id) | safe }}')">Hapus</button>
+                                                <a href="{{ url_for('edit_dosen', id=dosen._id) }}" class="btn btn-warning btn-sm">
+                                                    <i class="fas fa-edit"></i> Edit
+                                                </a>
+                                                <form action="{{ url_for('hapus_dosen', id=dosen._id) }}" method="POST" class="d-inline" onsubmit="return confirmDelete(this);">
+                                                    <button type="submit" class="btn btn-danger btn-sm">
+                                                        <i class="fas fa-trash"></i> Hapus
+                                                    </button>
+                                                </form>
                                             </td>
                                         </tr>
                                         {% endfor %}
@@ -82,17 +132,35 @@
 
         <!-- Footer -->
         {% include 'admin/footer.html' %}
-
     </div>
 
-    <!-- SweetAlert2 JS -->
+    <!-- Script untuk SweetAlert dan DataTables -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
-    <!-- SweetAlert2 Konfirmasi Penghapusan -->
+    <script src="{{ url_for('static', filename='admin_lte/plugins/jquery/jquery.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin_lte/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin_lte/plugins/datatables/jquery.dataTables.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin_lte/plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin_lte/plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='admin_lte/plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
+   <!-- SweetAlert2 untuk Pesan Flash -->
+   {% with messages = get_flashed_messages(with_categories=true) %}
+   {% if messages %}
+       <script>
+           Swal.fire({
+               icon: '{% if messages[0][0] == "success" %}success{% else %}error{% endif %}',
+               title: 'Pemberitahuan',
+               text: '{{ messages[0][1] }}',
+               timer: 3000,
+               showConfirmButton: false
+           });
+       </script>
+   {% endif %}
+   {% endwith %}
+    <!-- Script untuk konfirmasi penghapusan -->
     <script>
-        function confirmDelete(deleteUrl) {
+        function confirmDelete(form) {
             Swal.fire({
-                title: 'Anda yakin ingin menghapus dosen ini?',
+                title: 'Yakin ingin menghapus?',
                 text: "Tindakan ini tidak dapat dibatalkan!",
                 icon: 'warning',
                 showCancelButton: true,
@@ -102,40 +170,27 @@
                 cancelButtonText: 'Tidak'
             }).then((result) => {
                 if (result.isConfirmed) {
-                    // Redirect ke URL penghapusan dosen jika pengguna memilih "Ya"
-                    window.location.href = deleteUrl;
+                    form.submit();
                 }
-            })
+            });
+            return false;
         }
     </script>
 
-    <!-- SweetAlert2 untuk Pesan Flash -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <script>
-                Swal.fire({
-                    icon: '{% if messages[0][0] == "success" %}success{% else %}error{% endif %}',
-                    title: 'Pemberitahuan',
-                    text: '{{ messages[0][1] }}'
-                });
-            </script>
-        {% endif %}
-    {% endwith %}
-
-    <!-- Scripts -->
-    <script src="{{ url_for('static', filename='admin_lte/plugins/jquery/jquery.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='admin_lte/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='admin_lte/plugins/datatables/jquery.dataTables.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='admin_lte/plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='admin_lte/dist/js/adminlte.min.js') }}"></script>
-
+    <!-- Script untuk inisialisasi DataTable dengan pencarian -->
     <script>
         $(function () {
             $("#dosenTable").DataTable({
                 "responsive": true,
                 "autoWidth": false,
+                "searching": true,  // Aktifkan fitur pencarian
+                "paging": true,     // Aktifkan fitur pagination
+                "lengthChange": true, // User bisa mengatur jumlah data yang ditampilkan
             });
         });
     </script>
+
+    <!-- Script AdminLTE -->
+    <script src="{{ url_for('static', filename='admin_lte/dist/js/adminlte.min.js') }}"></script>
 </body>
 </html>

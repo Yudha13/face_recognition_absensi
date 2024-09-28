@@ -49,7 +49,62 @@
     - Bug pada pengelolaan NIM mahasiswa saat menambah atau mengedit data sudah diperbaiki. Sekarang, validasi NIM bentrok muncul saat masih di halaman tambah/edit mahasiswa.
     - Absensi berhasil mencatat kehadiran dan memperbarui laporan absensi di halaman kelola admin.
 
+- **20/09/2024**:
+  - **Modifikasi Fungsi Start dan Stop Kelas:**
+    - Ditambahkan fitur untuk mencatat waktu mulai dan selesai absensi di database.
+    - Dihitung selisih waktu kehadiran mahasiswa berdasarkan waktu mulai absensi.
+    - Pada frontend, proses stop kelas diperbaiki dengan penambahan argumen `kelas_id`.
+    - Tombol "Stop Kelas" di dashboard admin diaktifkan dan telah diuji agar berfungsi dengan baik.
+    
+  - **Laporan Absensi:**
+    - Perbaikan tampilan laporan absensi agar lebih responsif dan rapi.
+    - Ditambahkan kolom waktu pada laporan absensi dan rincian jumlah mahasiswa yang hadir dari total mahasiswa dalam kelas.
+    - Fitur unduh laporan absensi per tanggal telah diperbaiki.
+
+-**27/09/2024**:
+
+- **Fitur Unduh Rekap Absensi:**
+  - Implementasi fitur unduh rekap absensi kelas dalam format Excel yang disesuaikan untuk mencakup semua sesi absensi.
+  - Tabel absensi ditampilkan secara dinamis dengan persentase kehadiran mahasiswa dan disusun dalam format yang rapi untuk dicetak di kertas A4.
+  - Tampilan header laporan absensi diatur agar judul, dosen, dan jadwal kelas terformat dengan baik tanpa border.
+
+- **Perbaikan Laporan Per Sesi Absensi:**
+  - Fitur unduh laporan per sesi absensi diperbaiki untuk mencatat kehadiran, keterlambatan, dan ketidakhadiran mahasiswa secara akurat berdasarkan ID sesi absensi.
+  - Implementasi frontend dan backend untuk unduh laporan absensi per sesi selesai.
+
+- **Perbaikan Halaman Detail Absensi:**
+  - Masalah penampilan tanggal di header halaman **Detail Absensi** telah diperbaiki.
+  - Sekarang data absensi ditampilkan berdasarkan ID sesi absensi yang benar, bukan hanya berdasarkan tanggal.
+  - Nama mahasiswa yang hadir, waktu kehadiran, dan status kehadiran diperbaiki agar tampil sesuai sesi.
+
+- **Perbaikan Fitur Edit Dosen:**
+  - Masalah password yang hilang saat melakukan edit dosen tanpa mengubah password telah diperbaiki. Sekarang, jika password tidak diisi saat mengedit, password lama tetap dipertahankan.
+
+## 🛠️ Log Pengembangan
+
+### **27/09/2024**:
+
+- **Fitur Unduh Rekap Absensi:**
+  - Implementasi fitur unduh rekap absensi kelas dalam format Excel yang disesuaikan untuk mencakup semua sesi absensi.
+  - Tabel absensi ditampilkan secara dinamis dengan persentase kehadiran mahasiswa dan disusun dalam format yang rapi untuk dicetak di kertas A4.
+  - Tampilan header laporan absensi diatur agar judul, dosen, dan jadwal kelas terformat dengan baik tanpa border.
+
+- **Perbaikan Laporan Per Sesi Absensi:**
+  - Fitur unduh laporan per sesi absensi diperbaiki untuk mencatat kehadiran, keterlambatan, dan ketidakhadiran mahasiswa secara akurat berdasarkan ID sesi absensi.
+  - Implementasi frontend dan backend untuk unduh laporan absensi per sesi selesai.
+
+- **Perbaikan Halaman Detail Absensi:**
+  - Masalah penampilan tanggal di header halaman **Detail Absensi** telah diperbaiki.
+  - Sekarang data absensi ditampilkan berdasarkan ID sesi absensi yang benar, bukan hanya berdasarkan tanggal.
+  - Nama mahasiswa yang hadir, waktu kehadiran, dan status kehadiran diperbaiki agar tampil sesuai sesi.
+
+- **Perbaikan Fitur Edit Dosen:**
+  - Masalah password yang hilang saat melakukan edit dosen tanpa mengubah password telah diperbaiki. Sekarang, jika password tidak diisi saat mengedit, password lama tetap dipertahankan.
+
+- **Fitur Sesi Absensi di Dashboard:**
+  - Menambahkan fitur di halaman **Dashboard Admin** untuk menampilkan sesi absensi yang sedang berlangsung.
+  - Admin dapat memantau sesi yang aktif secara langsung dari dashboard dan menghentikan sesi jika diperlukan.
+
 ## Update Selanjutnya:
 - Penambahan pengujian dengan lebih banyak data mahasiswa.
-- Perbaikan fitur pengunduhan laporan absensi.
 - Penyesuaian tampilan dashboard dosen agar lebih informatif.
