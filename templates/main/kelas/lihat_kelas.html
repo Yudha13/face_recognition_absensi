@@ -6,8 +6,58 @@
     <title>Daftar Kelas - Sistem Absensi Dosen</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/dist/css/adminlte.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/fontawesome-free/css/all.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            border-color: #007bff;
+            font-weight: bold;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+            border-color: #004085;
+        }
+        .card-header {
+            background-color: #f8f9fa;
+        }
+        .table th, .table td {
+            vertical-align: middle;
+            text-align: center;
+        }
+        .badge {
+            font-size: 14px;
+        }
+        .table-responsive {
+            overflow-x: auto;
+        }
+
+        /* Tombol dan tabel mobile */
+        @media (max-width: 768px) {
+            .content-wrapper {
+                padding: 15px;
+            }
+            .btn-primary {
+                width: 100%; /* Buat tombol full width di mobile */
+                font-size: 14px;
+                padding: 8px;
+            }
+            .table th, .table td {
+                padding: 5px; /* Kurangi padding di tabel untuk mobile */
+                font-size: 12px;
+            }
+            .card-header h3 {
+                font-size: 16px;
+            }
+        }
+    </style>
 </head>
-<body class="hold-transition sidebar-mini">
+<body class="hold-transition sidebar-mini layout-fixed">
 <div class="wrapper">
 
     <!-- Navbar dan Sidebar -->
@@ -16,7 +66,6 @@
 
     <!-- Content Wrapper -->
     <div class="content-wrapper">
-        <!-- Content Header -->
         <section class="content-header">
             <div class="container-fluid">
                 <div class="row mb-2">
@@ -27,32 +76,46 @@
             </div>
         </section>
 
-        <!-- Main Content -->
         <section class="content">
             <div class="container-fluid">
-                <div class="row">
-                    {% for kelas in kelas_list %}
-                    <div class="col-lg-4 col-6">
-                        <div class="small-box 
-                            {% if loop.index % 4 == 1 %} bg-info
-                            {% elif loop.index % 4 == 2 %} bg-success
-                            {% elif loop.index % 4 == 3 %} bg-warning
-                            {% else %} bg-danger
-                            {% endif %}">
-                            <div class="inner">
-                                <h4>{{ kelas.nama_kelas }}</h4>
-                                <p>{{ kelas.jadwal_kelas }}</p>
-                                <p>Total Mahasiswa: {{ kelas.mahasiswa | length }}</p>
-                            </div>
-                            <div class="icon">
-                                <i class="fas fa-chalkboard"></i>
-                            </div>
-                            <a href="{{ url_for('dosen_detail_kelas', id=kelas._id) }}" class="small-box-footer">
-                                Detail Kelas <i class="fas fa-arrow-circle-right"></i>
-                            </a>
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Daftar Kelas</h3>
+                    </div>
+
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table id="kelasTable" class="table table-bordered table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>No</th>
+                                        <th>Nama Kelas</th>
+                                        <th>Jadwal</th>
+                                        <th>Jumlah Mahasiswa</th>
+                                        <th>Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for kelas in kelas_list %}
+                                    <tr>
+                                        <td>{{ loop.index }}</td>
+                                        <td>{{ kelas.nama_kelas }}</td>
+                                        <td>{{ kelas.hari }} {{ kelas.jam_mulai }} - {{ kelas.jam_selesai }}</td>
+                                        <td>{{ kelas.mahasiswa | length }}</td>
+                                        <td>
+                                            <button class="btn btn-success btn-sm" id="start_kelas_btn_{{ kelas._id }}" onclick="startKelas('{{ kelas._id }}')">
+                                                <i class="fas fa-play"></i> Mulai Kelas
+                                            </button>
+                                            <a href="{{ url_for('dosen_detail_kelas', id=kelas._id) }}" class="btn btn-info btn-sm">
+                                                <i class="fas fa-info-circle"></i> Detail
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
-                    {% endfor %}
                 </div>
             </div>
         </section>
@@ -62,8 +125,104 @@
     {% include 'main/footer.html' %}
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="{{ url_for('static', filename='admin_lte/plugins/jquery/jquery.min.js') }}"></script>
 <script src="{{ url_for('static', filename='admin_lte/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='admin_lte/plugins/datatables/jquery.dataTables.min.js') }}"></script>
+<script src="{{ url_for('static', filename='admin_lte/plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
+<script src="{{ url_for('static', filename='admin_lte/plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
+<script src="{{ url_for('static', filename='admin_lte/plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
 <script src="{{ url_for('static', filename='admin_lte/dist/js/adminlte.min.js') }}"></script>
+
+<!-- SweetAlert2 untuk Pesan Flash -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+    <script>
+        Swal.fire({
+            icon: '{% if messages[0][0] == "success" %}success{% else %}error{% endif %}',
+            title: 'Pemberitahuan',
+            text: '{{ messages[0][1] }}',
+            timer: 3000,
+            showConfirmButton: false
+        });
+    </script>
+{% endif %}
+{% endwith %}
+
+<!-- Script untuk konfirmasi memulai kelas -->
+<script>
+    function startKelas(kelas_id) {
+        console.log("Memulai kelas ID:", kelas_id);  // Debugging log
+
+        $("#start_kelas_btn_" + kelas_id).prop('disabled', true); // Disable tombol setelah diklik
+
+        Swal.fire({
+            title: 'Mulai Kelas?',
+            text: "Anda yakin ingin memulai kelas ini?",
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonText: 'Mulai',
+            cancelButtonText: 'Batal',
+            confirmButtonColor: '#28a745',
+            cancelButtonColor: '#d33'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                console.log("Konfirmasi untuk memulai kelas diterima.");  // Debugging log
+
+                // Lakukan AJAX untuk memulai kelas
+                $.ajax({
+                    url: "/dosen/start_kelas/" + kelas_id,
+                    type: "POST",
+                    dataType: 'json',  // Memastikan respons JSON diterima
+                    success: function (data) {
+                        console.log("Respons dari server:", data);  // Debugging log
+                        $("#start_kelas_btn_" + kelas_id).prop('disabled', false); // Enable tombol setelah selesai
+
+                        if (data.success) {
+                            Swal.fire({
+                                title: 'Sukses',
+                                text: data.message,
+                                icon: 'success',
+                                timer: 3000,
+                                showConfirmButton: false
+                            });
+                            // Optional: Update status kelas di halaman jika perlu
+                            // Misalnya: $("#kelas_status_" + kelas_id).text("Berlangsung");
+                        } else {
+                            Swal.fire({
+                                title: 'Error',
+                                text: data.message,
+                                icon: 'error',
+                                timer: 3000,
+                                showConfirmButton: false
+                            });
+                        }
+                    },
+                    error: function (xhr, status, error) {
+                        console.log("Error:", xhr.responseText);  // Log error dari server untuk debugging
+                        $("#start_kelas_btn_" + kelas_id).prop('disabled', false); // Enable tombol jika error
+                        Swal.fire('Error', 'Gagal memulai kelas. Silakan coba lagi.', 'error');
+                    }
+                });
+            } else {
+                $("#start_kelas_btn_" + kelas_id).prop('disabled', false); // Enable tombol jika dibatalkan
+                Swal.fire('Dibatalkan', 'Proses memulai kelas dibatalkan.', 'info');
+            }
+        });
+    }
+</script>
+
+<!-- Script untuk inisialisasi DataTable dengan pencarian -->
+<script>
+    $(function () {
+        $("#kelasTable").DataTable({
+            "responsive": true,
+            "autoWidth": false,
+            "searching": true,
+            "paging": true,
+            "lengthChange": true
+        });
+    });
+</script>
 </body>
 </html>

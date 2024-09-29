@@ -31,6 +31,11 @@ locale.setlocale(locale.LC_TIME, 'id_ID.UTF-8')  # Set locale Indonesia
 #Pada Bagian ini adalah rute untuk admin#
 #########################################
 
+#halaman default
+@app.route('/')
+def home():
+    return redirect(url_for('dosen_login')) 
+
 # Login Admin
 @app.route('/admin/login', methods=['GET', 'POST'])
 def admin_login():
@@ -57,39 +62,26 @@ def admin_logout():
 @app.route('/admin/dashboard')
 def admin_dashboard():
     if 'admin_logged_in' in session:
+        # Mengambil jumlah mahasiswa, dosen, kelas, dan laporan absensi
         jumlah_mahasiswa = db.mahasiswa.count_documents({})
         jumlah_dosen = db.dosen.count_documents({})
         jumlah_kelas = db.kelas.count_documents({})
+        jumlah_laporan_absensi = db.absensi.count_documents({})
 
-        # Menghitung total absensi dari semua kelas
-        total_absensi = db.absensi.count_documents({})
-
-        # Status proses training
-        training_status = session.get('training_status', None)  # Ambil status training dari session
+        # Mengambil semua kelas yang sedang berlangsung
+        kelas_berlangsung = list(db.kelas.find({"status": "Berlangsung"}))
+        for kelas in kelas_berlangsung:
+            kelas['dosen_pengampu'] = db.dosen.find_one({"_id": kelas['dosen_pengampu']})['nama']
 
         return render_template('admin/dashboard.html',
                                jumlah_mahasiswa=jumlah_mahasiswa,
                                jumlah_dosen=jumlah_dosen,
                                jumlah_kelas=jumlah_kelas,
-                               jumlah_laporan_absensi=total_absensi,
-                               training_status=training_status)
+                               jumlah_laporan_absensi=jumlah_laporan_absensi,
+                               kelas_berlangsung=kelas_berlangsung)
+
     else:
         return redirect(url_for('admin_login'))
-
-#rute check status absensi
-@app.route('/check_absensi_status', methods=['GET'])
-def check_absensi_status():
-    # Cari kelas yang statusnya sedang berlangsung
-    kelas_berlangsung = db.kelas.find_one({"status": "Berlangsung"})
-
-    if kelas_berlangsung:
-        return {
-            "status": "kelas_berlangsung",
-            "nama_kelas": kelas_berlangsung["nama_kelas"],
-            "kelas_id": str(kelas_berlangsung["_id"])
-        }
-    else:
-        return {"status": "no_class"}
 
 #######################################################################################################
 ## RUTE PENGELOLAAN MAHASISWA
@@ -257,17 +249,6 @@ def background_training(mahasiswa_id, folder_path, nim, index):
     except Exception as e:
         logging.error(f'Training gagal untuk Mahasiswa ID {mahasiswa_id}: {str(e)}')
         db.mahasiswa.update_one({'_id': ObjectId(mahasiswa_id)}, {"$set": {"training_in_progress": False}})
-
-# Endpoint untuk memeriksa status training secara real-time dengan progress
-@app.route('/check_all_training_status')
-def check_all_training_status():
-    # Ambil semua mahasiswa yang sedang dalam proses training dan progressnya
-    mahasiswa_in_training = list(db.mahasiswa.find({"training_in_progress": True}, {"_id": 1, "nama": 1, "progress": 1}))
-    
-    if mahasiswa_in_training:
-        return {"status": "training_in_progress", "mahasiswa": mahasiswa_in_training}, 200
-    
-    return {"status": "no_training"}, 204
 
 # Hapus Mahasiswa
 @app.route('/admin/hapus_mahasiswa/<id>', methods=['POST', 'GET'])
@@ -919,8 +900,8 @@ def dosen_login():
             session['dosen_name'] = dosen['nama']    # Simpan nama dosen ke session
             return redirect(url_for('dosen_dashboard'))
         else:
-            error = 'Login Gagal: Username atau Password salah.'
-            return render_template('main/login.html', error=error)
+            flash('Login Gagal: Username atau Password salah.', 'danger')  # Gunakan flash untuk error message
+            return redirect(url_for('dosen_login'))
     return render_template('main/login.html')
 
 # Rute Logout Dosen
@@ -931,26 +912,41 @@ def dosen_logout():
     session.pop('dosen_name', None)
     return redirect(url_for('dosen_login'))
 
-# Rute Dashboard Dosen
+#dashboard dosen
 @app.route('/dosen/dashboard')
 def dosen_dashboard():
     if 'dosen_logged_in' in session:
         dosen_id = session.get('dosen_id')
+
+        # Mengambil daftar kelas yang diajar oleh dosen
         kelas_list = list(db.kelas.find({"dosen_pengampu": ObjectId(dosen_id)}))
-        
+        for kelas in kelas_list:
+            # Ambil nama dosen pengampu
+            dosen = db.dosen.find_one({"_id": ObjectId(dosen_id)})
+            kelas['dosen_pengampu'] = dosen['nama']  # Ubah dosen_pengampu menjadi nama dosen
+
         # Mengambil semua ObjectId mahasiswa dari kelas yang diajar
         mahasiswa_ids = [ObjectId(mahasiswa_id) for kelas in kelas_list for mahasiswa_id in kelas['mahasiswa']]
-        
-        # Menghitung jumlah mahasiswa berdasarkan mahasiswa_ids
+
+        # Menghitung jumlah mahasiswa
         mahasiswa_count = db.mahasiswa.count_documents({"_id": {"$in": mahasiswa_ids}})
         
         # Menghitung jumlah absensi berdasarkan kelas yang diajar
         absensi_count = db.absensi.count_documents({"kelas_id": {"$in": [ObjectId(kelas['_id']) for kelas in kelas_list]}})
-        
-        return render_template('main/dashboard.html', 
-                               kelas_list=kelas_list, 
+
+        # Mengambil semua kelas yang sedang berlangsung
+        kelas_berlangsung = list(db.kelas.find({"status": "Berlangsung"}))
+        for kelas in kelas_berlangsung:
+            # Ambil nama dosen pengampu untuk setiap kelas yang sedang berlangsung
+            dosen_pengampu = db.dosen.find_one({"_id": kelas['dosen_pengampu']})
+            kelas['dosen_pengampu'] = dosen_pengampu['nama']  # Ubah dosen_pengampu menjadi nama dosen
+
+        return render_template('main/dashboard.html',
+                               kelas_list=kelas_list,
                                mahasiswa_count=mahasiswa_count,
-                               absensi_count=absensi_count, 
+                               absensi_count=absensi_count,
+                               kelas_berlangsung=kelas_berlangsung,
+                               dosen_logged_in_id=str(dosen_id),  # Ubah dosen_id menjadi string
                                dosen_name=session.get('dosen_name'))
     else:
         return redirect(url_for('dosen_login'))
@@ -975,16 +971,27 @@ def dosen_detail_kelas(id):
     else:
         return redirect(url_for('dosen_login'))
 
-# Rute untuk Melihat Daftar Mahasiswa yang Berkaitan dengan Dosen
+# Rute lihat Daftar Mahasiswa yang Berkaitan dengan Dosen
 @app.route('/dosen/mahasiswa')
 def dosen_mahasiswa():
     if 'dosen_logged_in' in session:
         dosen_id = session.get('dosen_id')
+
+        # Ambil daftar dosen
         kelas_list = list(db.kelas.find({"dosen_pengampu": ObjectId(dosen_id)}))
+        
+        # Kumpulkan mahasiswa yang terdaftar di kelas dosen
         mahasiswa_ids = set()
         for kelas in kelas_list:
             mahasiswa_ids.update(kelas['mahasiswa'])
+        
+        # Ambil info mhs berdasarkan ID
         mahasiswa_list = list(db.mahasiswa.find({"_id": {"$in": list(mahasiswa_ids)}}))
+
+        # Tambah info kelas yang diajar dosen untuk setiap mhs
+        for mahasiswa in mahasiswa_list:
+            mahasiswa['kelas_dosen'] = [kelas['nama_kelas'] for kelas in kelas_list if mahasiswa['_id'] in kelas['mahasiswa']]
+
         return render_template('main/mahasiswa/lihat_mahasiswa.html', mahasiswa_list=mahasiswa_list)
     else:
         return redirect(url_for('dosen_login'))
@@ -998,43 +1005,323 @@ def dosen_detail_mahasiswa(id):
     else:
         return redirect(url_for('dosen_login'))
 
-# Rute untuk Melihat Rekap Absensi
-@app.route('/dosen/absensi')
-def dosen_absensi():
+# Rute untuk Laporan Absensi Dosen
+@app.route('/dosen/laporan_absensi')
+def dosen_laporan_absensi():
     if 'dosen_logged_in' in session:
         dosen_id = session.get('dosen_id')
-        kelas_list = list(db.kelas.find({"dosen_pengampu": ObjectId(dosen_id)}))
-        absensi_list = []
-        for kelas in kelas_list:
-            absensi_list.extend(list(db.absensi.find({"kelas_id": ObjectId(kelas['_id'])})))
-        return render_template('main/absensi/lihat_absensi.html', absensi_list=absensi_list)
+
+        # Ambil daftar kelas yang diajar oleh dosen login
+        kelas_list = list(db.kelas.aggregate([
+            {
+                '$match': {
+                    'dosen_pengampu': ObjectId(dosen_id)
+                }
+            },
+            {
+                '$lookup': {
+                    'from': 'dosen',
+                    'localField': 'dosen_pengampu',
+                    'foreignField': '_id',
+                    'as': 'dosen'
+                }
+            },
+            {
+                '$unwind': {
+                    'path': '$dosen',
+                    'preserveNullAndEmptyArrays': True
+                }
+            },
+            {
+                '$project': {
+                    'nama_kelas': 1,
+                    'dosen.nama': 1,
+                    'jumlah_mahasiswa': {'$size': '$mahasiswa'},
+                    'hari': 1,
+                    'jam_mulai': 1,
+                    'jam_selesai': 1,
+                    '_id': 1
+                }
+            }
+        ]))
+
+        return render_template('main/absensi/laporan_absensi.html', kelas_list=kelas_list)
     else:
         return redirect(url_for('dosen_login'))
 
-# Rute untuk Mengunduh Rekap Absensi
-@app.route('/dosen/unduh_absensi')
-def dosen_unduh_absensi():
+# Rute lihat absensi untuk dosen
+@app.route('/dosen/lihat_absensi/<kelas_id>')
+def dosen_lihat_absensi(kelas_id):
     if 'dosen_logged_in' in session:
         dosen_id = session.get('dosen_id')
-        kelas_list = list(db.kelas.find({"dosen_pengampu": ObjectId(dosen_id)}))
-        absensi_list = []
-        for kelas in kelas_list:
-            absensi_list.extend(list(db.absensi.find({"kelas_id": ObjectId(kelas['_id'])})))
+
+        # Pastikan dosen hanya bisa melihat absensi untuk kelas yang dia ajar
+        kelas = db.kelas.find_one({"_id": ObjectId(kelas_id), "dosen_pengampu": ObjectId(dosen_id)})
         
-        # Buat laporan absensi ke Excel # testing fitur
-        import pandas as pd
-        data = [{
-            "Tanggal": absensi['tanggal'],
-            "Nama Kelas": db.kelas.find_one({"_id": ObjectId(absensi['kelas_id'])})['nama_kelas'],
-            "Nama Mahasiswa": db.mahasiswa.find_one({"_id": ObjectId(absensi['mahasiswa_id'])})['nama'],
-            "Status Kehadiran": absensi['status']
-        } for absensi in absensi_list]
+        if not kelas:
+            return "Kelas tidak ditemukan atau Anda tidak memiliki akses ke kelas ini", 403
 
+        # Ambil data absensi berdasarkan kelas_id
+        absensi_list = list(db.absensi.find(
+            {'kelas_id': ObjectId(kelas_id)},  # Filter absensi berdasarkan kelas_id
+            {
+                'waktu_mulai': 1,
+                'waktu_selesai': 1,
+                'mahasiswa_hadir': 1
+            }
+        ))
+
+        # Hitung total mahasiswa yang terdaftar di kelas
+        total_mahasiswa = len(kelas['mahasiswa'])
+
+        # Kirim data absensi dan total_mahasiswa ke template dosen
+        return render_template('main/absensi/lihat_absensi.html', absensi_list=absensi_list, kelas=kelas, total_mahasiswa=total_mahasiswa)
+    else:
+        return redirect(url_for('dosen_login'))
+
+# Rute untuk Lihat Detail Absensi (Dosen)
+@app.route('/dosen/lihat_detail_absensi/<kelas_id>/<absensi_id>')
+def dosen_lihat_detail_absensi(kelas_id, absensi_id):
+    if 'dosen_logged_in' in session:
+        dosen_id = session.get('dosen_id')
+
+        # Pastikan dosen hanya bisa melihat absensi untuk kelas yang dia ajar
+        kelas = db.kelas.find_one({"_id": ObjectId(kelas_id), "dosen_pengampu": ObjectId(dosen_id)})
+        
+        if not kelas:
+            flash("Kelas tidak ditemukan atau Anda tidak memiliki akses ke kelas ini", "danger")
+            return redirect(url_for('dosen_laporan_absensi'))
+
+        # Ambil data absensi berdasarkan ID absensi yang dipilih
+        absensi = db.absensi.find_one({
+            '_id': ObjectId(absensi_id),
+            'kelas_id': ObjectId(kelas_id)
+        })
+
+        if not absensi:
+            flash("Data absensi tidak ditemukan untuk sesi ini", "danger")
+            return redirect(url_for('lihat_absensi_dosen', kelas_id=kelas_id))
+
+        # Ambil seluruh mahasiswa di kelas tersebut
+        mahasiswa_list = list(db.mahasiswa.find({"_id": {"$in": kelas['mahasiswa']}}, {'nama': 1, 'nim': 1}))
+
+        # Siapkan data absensi dengan status kehadiran
+        detail_absensi = []
+        hadir_ids = {str(hadir['mahasiswa_id']) for hadir in absensi['mahasiswa_hadir']}
+
+        for mahasiswa in mahasiswa_list:
+            mahasiswa_id_str = str(mahasiswa['_id'])
+            if mahasiswa_id_str in hadir_ids:
+                hadir_mahasiswa = next(
+                    (hadir for hadir in absensi['mahasiswa_hadir'] if str(hadir['mahasiswa_id']) == mahasiswa_id_str),
+                    {}
+                )
+                detail_absensi.append({
+                    'nama': mahasiswa['nama'],
+                    'nim': mahasiswa['nim'],
+                    'status': 'Terlambat' if hadir_mahasiswa.get('terlambat', False) else 'Hadir',
+                    'waktu': hadir_mahasiswa['waktu_hadir'].strftime('%H:%M:%S')  # Hanya menampilkan waktu hadir
+                })
+            else:
+                detail_absensi.append({
+                    'nama': mahasiswa['nama'],
+                    'nim': mahasiswa['nim'],
+                    'status': 'Tidak Hadir',
+                    'waktu': '-'  # Tidak hadir tidak memiliki waktu hadir
+                })
+
+        # Format tanggal absensi
+        tanggal = absensi['waktu_mulai'].strftime('%d-%m-%Y')
+
+        # Kirim data absensi, kelas, dan tanggal ke template HTML
+        return render_template('main/absensi/lihat_detail_absensi.html', detail_absensi=detail_absensi, kelas=kelas, absensi=absensi, tanggal=tanggal)
+    else:
+        return redirect(url_for('dosen_login'))
+
+#rute dosen untuk unduh rekap absen
+@app.route('/dosen/unduh_rekapitulasi_absensi/<kelas_id>')
+def dosen_unduh_rekapitulasi_absensi(kelas_id):
+    if 'dosen_logged_in' in session:
+        dosen_id = session.get('dosen_id')
+
+        # Ambil informasi kelas dan pastikan dosen yang mengajar
+        kelas = db.kelas.find_one({"_id": ObjectId(kelas_id), "dosen_pengampu": ObjectId(dosen_id)})
+        if not kelas:
+            flash("Anda tidak memiliki akses ke kelas ini", "danger")
+            return redirect(url_for('dosen_laporan_absensi'))
+
+        dosen = db.dosen.find_one({"_id": ObjectId(dosen_id)})
+        absensi_list = db.absensi.find({'kelas_id': ObjectId(kelas_id)})
+
+        # Ambil daftar mahasiswa
+        mahasiswa_list = list(db.mahasiswa.find({"_id": {"$in": kelas['mahasiswa']}}))
+        mahasiswa_dict = {str(mhs['_id']): mhs for mhs in mahasiswa_list}
+
+        # Siapkan data absensi mahasiswa dan tanggal absensi
+        tanggal_list = []
+        data_dict = {str(mhs['_id']): [] for mhs in mahasiswa_list}
+
+        for absensi in absensi_list:
+            tanggal = absensi['waktu_mulai'].strftime('%d-%m-%Y')
+            tanggal_list.append(tanggal)
+            for mhs_id in kelas['mahasiswa']:
+                hadir = next((hadir for hadir in absensi['mahasiswa_hadir'] if hadir['mahasiswa_id'] == str(mhs_id)), None)
+                if hadir:
+                    data_dict[str(mhs_id)].append('Terlambat' if hadir['terlambat'] else 'Hadir')
+                else:
+                    data_dict[str(mhs_id)].append('Tidak Hadir')
+
+        # Tambahkan persentase kehadiran
+        for mhs_id, kehadiran_list in data_dict.items():
+            total_hadir = kehadiran_list.count('Hadir') + kehadiran_list.count('Terlambat')
+            total_sesi = len(tanggal_list)
+            persentase = (total_hadir / total_sesi) * 100 if total_sesi > 0 else 0
+            data_dict[mhs_id].append(f"{persentase:.2f}%")
+
+        # Buat DataFrame dari data absensi
+        df = pd.DataFrame(data_dict, index=tanggal_list + ['Persentase']).T
+
+        # Simpan ke file Excel
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            workbook = writer.book
+            worksheet = workbook.add_worksheet('Rekap Absensi')
+
+            # Tulis header tabel
+            header_format = workbook.add_format({'bold': True, 'align': 'center', 'bg_color': '#d9ead3', 'border': 1})
+            hadir_format = workbook.add_format({'bg_color': '#b6d7a8', 'border': 1})
+            terlambat_format = workbook.add_format({'bg_color': '#f9cb9c', 'border': 1})
+            tidak_hadir_format = workbook.add_format({'bg_color': '#e06666', 'border': 1})
+            nomor_format = workbook.add_format({'align': 'center', 'valign': 'vcenter', 'border': 1})
+
+            # Tulis informasi kelas
+            worksheet.write('A1', f"Daftar Hadir Kelas {kelas['nama_kelas']}")
+            worksheet.write('A2', 'Dosen:')
+            worksheet.merge_range('B2:D2', dosen['nama'])
+            worksheet.write('A3', 'Jadwal:')
+            worksheet.merge_range('B3:D3', f"{kelas['hari']} {kelas['jam_mulai']} - {kelas['jam_selesai']}")
+
+            # Tulis header tabel absensi
+            row_offset = 4
+            worksheet.write(row_offset, 0, "No", header_format)
+            worksheet.write(row_offset, 1, "NIM", header_format)
+            worksheet.write(row_offset, 2, "Nama Mahasiswa", header_format)
+            for col_num, col_name in enumerate(tanggal_list):
+                worksheet.write(row_offset, col_num + 3, col_name, header_format)
+            worksheet.write(row_offset, len(tanggal_list) + 3, "Persentase Kehadiran", header_format)
+
+            # Tulis data absensi mahasiswa
+            for row_num, (mhs_id, row_data) in enumerate(df.iterrows()):
+                worksheet.write(row_offset + row_num + 1, 0, row_num + 1, nomor_format)  # No
+                worksheet.write(row_offset + row_num + 1, 1, mahasiswa_dict[mhs_id]['nim'], nomor_format)  # NIM
+                worksheet.write(row_offset + row_num + 1, 2, mahasiswa_dict[mhs_id]['nama'], nomor_format)  # Nama Mahasiswa
+                for col_num, cell_value in enumerate(row_data[:-1]):  # Tidak mewarnai persentase
+                    if cell_value == 'Hadir':
+                        worksheet.write(row_offset + row_num + 1, col_num + 3, cell_value, hadir_format)
+                    elif cell_value == 'Terlambat':
+                        worksheet.write(row_offset + row_num + 1, col_num + 3, cell_value, terlambat_format)
+                    else:
+                        worksheet.write(row_offset + row_num + 1, col_num + 3, cell_value, tidak_hadir_format)
+                worksheet.write(row_offset + row_num + 1, len(tanggal_list) + 3, row_data[-1], nomor_format)  # Persentase
+
+        output.seek(0)
+
+        return send_file(output, download_name=f'Rekapitulasi_Absensi_Kelas_{kelas["nama_kelas"]}.xlsx', as_attachment=True)
+    else:
+        return redirect(url_for('dosen_login'))
+
+#rute dosen untuk unduh absen persesi
+@app.route('/dosen/unduh_laporan_absensi/<absensi_id>')
+def dosen_unduh_laporan_absensi(absensi_id):
+    if 'dosen_logged_in' in session:
+        dosen_id = session.get('dosen_id')
+
+        # Ambil data absensi berdasarkan ID
+        absensi = db.absensi.find_one({"_id": ObjectId(absensi_id)})
+        if not absensi:
+            flash("Absensi tidak ditemukan", "danger")
+            return redirect(url_for('dosen_laporan_absensi'))
+
+        # Ambil informasi kelas dan pastikan dosen yang mengajar
+        kelas = db.kelas.find_one({"_id": absensi['kelas_id'], "dosen_pengampu": ObjectId(dosen_id)})
+        if not kelas:
+            flash("Anda tidak memiliki akses ke kelas ini", "danger")
+            return redirect(url_for('dosen_laporan_absensi'))
+
+        dosen = db.dosen.find_one({"_id": ObjectId(dosen_id)})
+
+        # Ambil semua mahasiswa yang terdaftar di kelas tersebut
+        mahasiswa_list = list(db.mahasiswa.find({"_id": {"$in": kelas['mahasiswa']}}))
+        mahasiswa_dict = {str(mhs['_id']): mhs for mhs in mahasiswa_list}
+
+        # Siapkan data absensi per mahasiswa
+        absensi_data = {}
+        waktu_mulai = absensi['waktu_mulai'].strftime('%H:%M:%S')
+        waktu_selesai = absensi.get('waktu_selesai', 'N/A').strftime('%H:%M:%S') if absensi.get('waktu_selesai') else 'N/A'
+
+        # Loop melalui absensi mahasiswa yang hadir di sesi ini
+        for hadir in absensi['mahasiswa_hadir']:
+            mahasiswa_id = hadir['mahasiswa_id']
+            absensi_data[mahasiswa_id] = {
+                'terlambat': hadir['terlambat'],
+                'waktu_hadir': hadir['waktu_hadir'].strftime('%H:%M:%S')
+            }
+
+        # Siapkan data untuk laporan
+        data = []
+        for mhs_id, mhs_data in mahasiswa_dict.items():
+            if mhs_id in absensi_data:
+                status_kehadiran = "Terlambat" if absensi_data[mhs_id]['terlambat'] else "Hadir"
+                waktu_hadir = absensi_data[mhs_id]['waktu_hadir']
+            else:
+                status_kehadiran = "Tidak Hadir"
+                waktu_hadir = "N/A"
+
+            data.append({
+                "NIM": mhs_data['nim'],
+                "Nama Mahasiswa": mhs_data['nama'],
+                "Status Kehadiran": status_kehadiran,
+                "Waktu Kehadiran": waktu_hadir
+            })
+
+        # Buat DataFrame dari data
         df = pd.DataFrame(data)
-        file_path = "/tmp/rekap_absensi.xlsx"
-        df.to_excel(file_path, index=False)
 
-        return send_file(file_path, as_attachment=True)
+        # Simpan ke file Excel
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            workbook = writer.book
+            worksheet = workbook.add_worksheet('Absensi Sesi')
+
+            # Format header
+            header_format = workbook.add_format({'bold': True, 'align': 'center', 'bg_color': '#d9ead3'})
+            merge_format = workbook.add_format({'bold': True, 'align': 'center', 'valign': 'vcenter'})
+            border_format = workbook.add_format({'border': 1})
+
+            # Tulis header laporan
+            tanggal_absensi = absensi['waktu_mulai'].strftime('%d-%m-%Y')
+            worksheet.merge_range('A1:D1', f"Absensi Kelas {kelas['nama_kelas']} Tanggal {tanggal_absensi}", merge_format)
+            worksheet.merge_range('A2:D2', f"Dosen: {dosen['nama']}     Jadwal: {kelas['jam_mulai']} - {kelas['jam_selesai']}", merge_format)
+            worksheet.merge_range('A3:D3', f"Proses Absensi: {waktu_mulai} - {waktu_selesai}", merge_format)
+
+            # Tulis header tabel
+            worksheet.write(4, 0, "No", header_format)
+            worksheet.write(4, 1, "NIM", header_format)
+            worksheet.write(4, 2, "Nama Mahasiswa", header_format)
+            worksheet.write(4, 3, "Status Kehadiran", header_format)
+            worksheet.write(4, 4, "Waktu Kehadiran", header_format)
+
+            # Tulis data absensi
+            for idx, row in enumerate(df.itertuples(), start=1):
+                worksheet.write(idx + 4, 0, idx, border_format)
+                worksheet.write(idx + 4, 1, row.NIM, border_format)
+                worksheet.write(idx + 4, 2, row._2, border_format)  # Nama Mahasiswa
+                worksheet.write(idx + 4, 3, row._3, border_format)  # Status Kehadiran
+                worksheet.write(idx + 4, 4, row._4, border_format)  # Waktu Kehadiran
+
+        output.seek(0)
+
+        return send_file(output, download_name=f'Absensi_{kelas["nama_kelas"]}_{tanggal_absensi}.xlsx', as_attachment=True)
     else:
         return redirect(url_for('dosen_login'))
 
@@ -1053,6 +1340,11 @@ def start_kelas(kelas_id):
     # Periksa jika tidak ada mahasiswa
     if not kelas['mahasiswa']:
         return jsonify({"success": False, "message": "Tidak ada mahasiswa di kelas ini"})
+    
+    # Cek apakah ada kelas lain yang sedang berlangsung
+    kelas_berlangsung = db.kelas.find_one({"status": "Berlangsung"})
+    if kelas_berlangsung:
+        return jsonify({"success": False, "message": f"Kelas {kelas_berlangsung['nama_kelas']} sedang berlangsung. Tidak dapat memulai kelas baru."})
 
     # Hentikan proses face recognition sebelumnya jika ada
     if face_recognition_process and face_recognition_process.poll() is None:
@@ -1073,28 +1365,113 @@ def start_kelas(kelas_id):
 def stop_kelas(kelas_id):
     global face_recognition_process
 
-    print(f"Kelas ID yang diterima: {kelas_id}")
+    # Cari data kelas berdasarkan ID
+    kelas = db.kelas.find_one({"_id": ObjectId(kelas_id)})
 
-    # Jika ada proses face recognition yang berjalan, hentikan prosesnya
-    if face_recognition_process is not None and face_recognition_process.poll() is None:
-        face_recognition_process.terminate()
-        face_recognition_process.wait()
-        face_recognition_process = None
-        print("Proses face recognition dihentikan.")
+    if kelas:
+        # Jika ada proses face recognition yang berjalan, hentikan prosesnya
+        if face_recognition_process is not None and face_recognition_process.poll() is None:
+            face_recognition_process.terminate()
+            face_recognition_process.wait()
+            face_recognition_process = None
+            print("Proses face recognition dihentikan.")
 
-    # Update status kelas dan absensi di MongoDB
-    waktu_selesai_absensi = datetime.now()
-    db.absensi.update_one(
-        {"kelas_id": ObjectId(kelas_id), "status": "Berlangsung"},
-        {"$set": {"status": "Tidak Berlangsung", "waktu_selesai": waktu_selesai_absensi}}
-    )
-    db.kelas.update_one(
-        {"_id": ObjectId(kelas_id)},
-        {"$set": {"status": "Tidak Berlangsung"}}
-    )
+        # Update status kelas dan absensi di MongoDB
+        waktu_selesai_absensi = datetime.now()
+        db.absensi.update_one(
+            {"kelas_id": ObjectId(kelas_id), "status": "Berlangsung"},
+            {"$set": {"status": "Tidak Berlangsung", "waktu_selesai": waktu_selesai_absensi}}
+        )
+        db.kelas.update_one(
+            {"_id": ObjectId(kelas_id)},
+            {"$set": {"status": "Tidak Berlangsung"}}
+        )
 
-    return jsonify({"success": True, "message": f"Proses face recognition untuk kelas {kelas_id} dihentikan."})
+        # Kirim respons dengan nama kelas, bukan ID
+        return jsonify({"success": True, "message": f"Proses face recognition untuk kelas {kelas['nama_kelas']} dihentikan."})
+    else:
+        return jsonify({"success": False, "message": "Kelas tidak ditemukan."})
+
+# Route untuk memulai absensi oleh dosen
+@app.route('/dosen/start_kelas/<kelas_id>', methods=['POST'])
+def dosen_start_kelas(kelas_id):
+    global face_recognition_process
+
+    if 'dosen_logged_in' in session:
+        dosen_id = session.get('dosen_id')
+
+        # Pastikan dosen hanya dapat mengelola kelas yang dia ajar
+        kelas = db.kelas.find_one({"_id": ObjectId(kelas_id), "dosen_pengampu": ObjectId(dosen_id)})
+
+        if not kelas:
+            return jsonify({"success": False, "message": "Kelas tidak ditemukan atau Anda tidak memiliki akses"})
+
+        # Cek apakah ada kelas lain yang sedang berlangsung
+        kelas_berlangsung = db.kelas.find_one({"status": "Berlangsung"})
+        if kelas_berlangsung:
+            return jsonify({"success": False, "message": f"Kelas {kelas_berlangsung['nama_kelas']} sedang berlangsung. Tidak dapat memulai kelas baru."})
+
+        # Periksa jika tidak ada mahasiswa di kelas ini
+        if not kelas['mahasiswa']:
+            return jsonify({"success": False, "message": "Tidak ada mahasiswa di kelas ini"})
+
+        # Hentikan proses face recognition sebelumnya jika ada
+        if face_recognition_process and face_recognition_process.poll() is None:
+            face_recognition_process.terminate()
+            face_recognition_process.wait()
+
+        # Jalankan subprocess untuk face recognition
+        face_recognition_process = subprocess.Popen(['python3', 'face_recognition.py', str(kelas_id)])
+
+        # Update status kelas di MongoDB
+        waktu_mulai_absensi = datetime.now()
+        db.kelas.update_one(
+            {"_id": ObjectId(kelas_id)},
+            {"$set": {"status": "Berlangsung", "waktu_mulai_absensi": waktu_mulai_absensi}}
+        )
+
+        return jsonify({"success": True, "message": f"Kelas {kelas['nama_kelas']} dimulai oleh dosen."})
+
+    else:
+        return redirect(url_for('dosen_login'))
+
+# Route untuk menghentikan absensi oleh dosen
+@app.route('/dosen/stop_kelas/<kelas_id>', methods=['POST'])
+def stop_kelas_dosen(kelas_id):
+    global face_recognition_process
+
+    if 'dosen_logged_in' in session:
+        dosen_id = session.get('dosen_id')
+
+        # Pastikan dosen hanya dapat menghentikan absensi kelas yang dia ajar
+        kelas = db.kelas.find_one({"_id": ObjectId(kelas_id), "dosen_pengampu": ObjectId(dosen_id)})
+
+        if not kelas:
+            return jsonify({"success": False, "message": "Kelas tidak ditemukan atau Anda tidak memiliki akses"})
+
+        # Jika ada proses face recognition yang berjalan, hentikan prosesnya
+        if face_recognition_process is not None and face_recognition_process.poll() is None:
+            face_recognition_process.terminate()
+            face_recognition_process.wait()
+            face_recognition_process = None
+            print("Proses face recognition dihentikan.")
+
+        # Update status kelas dan absensi di MongoDB
+        waktu_selesai_absensi = datetime.now()
+        db.absensi.update_one(
+            {"kelas_id": ObjectId(kelas_id), "status": "Berlangsung"},
+            {"$set": {"status": "Tidak Berlangsung", "waktu_selesai": waktu_selesai_absensi}}
+        )
+        db.kelas.update_one(
+            {"_id": ObjectId(kelas_id)},
+            {"$set": {"status": "Tidak Berlangsung"}}
+        )
+
+        return jsonify({"success": True, "message": f"Proses face recognition untuk kelas {kelas['nama_kelas']} dihentikan oleh dosen."})
+
+    else:
+        return redirect(url_for('dosen_login'))
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000)
 

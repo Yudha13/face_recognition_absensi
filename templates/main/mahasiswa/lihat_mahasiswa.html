@@ -3,11 +3,59 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lihat Mahasiswa - Sistem Absensi Dosen</title>
+    <title>Daftar Mahasiswa - Sistem Absensi Dosen</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/dist/css/adminlte.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/fontawesome-free/css/all.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            border-color: #007bff;
+            font-weight: bold;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+            border-color: #004085;
+        }
+        .card-header {
+            background-color: #f8f9fa;
+        }
+        .table th, .table td {
+            vertical-align: middle;
+            text-align: center;
+        }
+        .badge {
+            font-size: 14px;
+        }
+        .table-responsive {
+            overflow-x: auto;
+        }
+
+        /* Tombol dan tabel mobile */
+        @media (max-width: 768px) {
+            .content-wrapper {
+                padding: 15px;
+            }
+            .btn-primary {
+                width: 100%;
+                font-size: 14px;
+                padding: 8px;
+            }
+            .table th, .table td {
+                padding: 5px;
+                font-size: 12px;
+            }
+            .card-header h3 {
+                font-size: 16px;
+            }
+        }
+    </style>
 </head>
-<body class="hold-transition sidebar-mini">
+<body class="hold-transition sidebar-mini layout-fixed">
 <div class="wrapper">
 
     <!-- Navbar dan Sidebar -->
@@ -16,47 +64,57 @@
 
     <!-- Content Wrapper -->
     <div class="content-wrapper">
-        <!-- Content Header -->
         <section class="content-header">
             <div class="container-fluid">
                 <div class="row mb-2">
                     <div class="col-sm-6">
-                        <h1>Mahasiswa yang Anda Ajar</h1>
+                        <h1>Daftar Mahasiswa yang Anda Ajar</h1>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- Main Content -->
         <section class="content">
             <div class="container-fluid">
                 <div class="card">
                     <div class="card-header">
                         <h3 class="card-title">Daftar Mahasiswa</h3>
                     </div>
-                    <div class="card-body table-responsive"> <!-- Tabel Responsif -->
-                        <table class="table table-bordered table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Nama Mahasiswa</th>
-                                    <th>NIM</th>
-                                    <th>Email</th>
-                                    <th>Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for mahasiswa in mahasiswa_list %}
+
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table id="mahasiswaTable" class="table table-bordered table-striped">
+                                <thead>
                                     <tr>
-                                        <td>{{ mahasiswa.nama }}</td>
+                                        <th>No</th>
+                                        <th>NIM</th>
+                                        <th>Nama Mahasiswa</th>
+                                        <th>Kelas</th>
+                                        <th>Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for mahasiswa in mahasiswa_list %}
+                                    <tr>
+                                        <td>{{ loop.index }}</td>
                                         <td>{{ mahasiswa.nim }}</td>
-                                        <td>{{ mahasiswa.email }}</td>
+                                        <td>{{ mahasiswa.nama }}</td>
                                         <td>
-                                            <a href="{{ url_for('dosen_detail_mahasiswa', id=mahasiswa._id) }}" class="btn btn-info btn-sm">Detail</a>
+                                            {% set colors = ['badge-primary', 'badge-secondary', 'badge-success', 'badge-danger', 'badge-warning', 'badge-info', 'badge-light', 'badge-dark'] %}
+                                            {% for kelas in mahasiswa.kelas_dosen %}
+                                                <span class="badge {{ colors[loop.index0 % colors|length] }}">{{ kelas }}</span>
+                                            {% endfor %}
+                                        </td>                                                                               
+                                        <td>
+                                            <a href="{{ url_for('dosen_detail_mahasiswa', id=mahasiswa._id) }}" class="btn btn-info btn-sm">
+                                                <i class="fas fa-info-circle"></i> Detail
+                                            </a>
                                         </td>
                                     </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -69,7 +127,24 @@
 
 <script src="{{ url_for('static', filename='admin_lte/plugins/jquery/jquery.min.js') }}"></script>
 <script src="{{ url_for('static', filename='admin_lte/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='admin_lte/plugins/datatables/jquery.dataTables.min.js') }}"></script>
+<script src="{{ url_for('static', filename='admin_lte/plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
+<script src="{{ url_for('static', filename='admin_lte/plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
+<script src="{{ url_for('static', filename='admin_lte/plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
 <script src="{{ url_for('static', filename='admin_lte/dist/js/adminlte.min.js') }}"></script>
+
+<!-- Script untuk inisialisasi DataTable dengan pencarian -->
+<script>
+    $(function () {
+        $("#mahasiswaTable").DataTable({
+            "responsive": true,
+            "autoWidth": false,
+            "searching": true,
+            "paging": true,
+            "lengthChange": true
+        });
+    });
+</script>
+
 </body>
 </html>
-

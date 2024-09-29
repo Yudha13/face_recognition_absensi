@@ -112,12 +112,15 @@
                                             <td>{{ mahasiswa.nomor_hp }}</td>
                                             <!-- Tampilkan status training -->
                                             <td>
-                                                {% if mahasiswa.trained %}
+                                                {% if mahasiswa.training_in_progress %}
+                                                    <span class="badge badge-warning">Sedang di-train ({{ mahasiswa.progress }}%)</span>
+                                                {% elif mahasiswa.trained %}
                                                     <span class="badge badge-success">Sudah di-train</span>
                                                 {% else %}
                                                     <span class="badge badge-danger">Belum di-train</span>
                                                 {% endif %}
                                             </td>
+                                            
                                             <td>
                                                 <a href="{{ url_for('edit_mahasiswa', id=mahasiswa._id) }}" class="btn btn-warning btn-sm">
                                                     <i class="fas fa-edit"></i> Edit

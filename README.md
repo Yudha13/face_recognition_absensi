@@ -3,7 +3,6 @@
 ## 📜 Deskripsi Project
 Project ini adalah sistem absensi berbasis pengenalan wajah yang dibangun menggunakan **Flask**, **MongoDB**, dan **Raspberry Pi**. Sistem ini memudahkan admin dalam mengelola data dosen, mahasiswa, kelas, serta laporan absensi.
 
-**Catatan:** Sistem ini masih dalam tahap pengembangan dan belum sepenuhnya selesai.
 
 ## 🛠️ Log Pengembangan
 Untuk info lebih lengkap terkait log pengembangan sistem ini silahkan lihat [Log Pengembangan](log.md).

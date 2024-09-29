@@ -119,7 +119,14 @@
                                             <td>{{ loop.index }}</td>
                                             <td>{{ absensi['waktu_mulai'].strftime('%d-%m-%Y') }}</td> <!-- Tampilkan tanggal -->
                                             <td>{{ absensi['waktu_mulai'].strftime('%A') }}</td> <!-- Tampilkan hari -->
-                                            <td>{{ absensi['waktu_mulai'].strftime('%H:%M') }} - {{ absensi['waktu_selesai'].strftime('%H:%M') }}</td> <!-- Waktu mulai - selesai -->
+                                            <td>
+                                                {% if absensi['waktu_selesai'] %}
+                                                    {{ absensi['waktu_mulai'].strftime('%H:%M') }} - {{ absensi['waktu_selesai'].strftime('%H:%M') }}
+                                                {% else %}
+                                                    Sedang Berlangsung
+                                                {% endif %}
+                                            </td>
+                                            
                                             <td>{{ absensi['mahasiswa_hadir'] | length }} dari {{ total_mahasiswa }} mahasiswa</td> <!-- Jumlah hadir dan total mahasiswa -->
                                             <td>
                                                 <a href="{{ url_for('lihat_detail_absensi', kelas_id=kelas._id, absensi_id=absensi._id, tanggal=absensi['waktu_mulai'].strftime('%d-%m-%Y')) }}" class="btn btn-warning btn-sm">

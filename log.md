@@ -80,8 +80,6 @@
 - **Perbaikan Fitur Edit Dosen:**
   - Masalah password yang hilang saat melakukan edit dosen tanpa mengubah password telah diperbaiki. Sekarang, jika password tidak diisi saat mengedit, password lama tetap dipertahankan.
 
-## 🛠️ Log Pengembangan
-
 ### **27/09/2024**:
 
 - **Fitur Unduh Rekap Absensi:**
@@ -102,9 +100,26 @@
   - Masalah password yang hilang saat melakukan edit dosen tanpa mengubah password telah diperbaiki. Sekarang, jika password tidak diisi saat mengedit, password lama tetap dipertahankan.
 
 - **Fitur Sesi Absensi di Dashboard:**
-  - Menambahkan fitur di halaman **Dashboard Admin** untuk menampilkan sesi absensi yang sedang berlangsung.
+  - Menambahkan fitur di halaman **Dashboard Admin** dan **Dashboard Dosen** untuk menampilkan sesi absensi yang sedang berlangsung.
   - Admin dapat memantau sesi yang aktif secara langsung dari dashboard dan menghentikan sesi jika diperlukan.
 
-## Update Selanjutnya:
-- Penambahan pengujian dengan lebih banyak data mahasiswa.
-- Penyesuaian tampilan dashboard dosen agar lebih informatif.
+### **29/09/2024**
+
+- **Perbaikan Dashboard Dosen dan Admin**:
+  - Menampilkan nama dosen yang sedang login di dashboard dosen dan memperbaiki tampilan kelas yang sedang berlangsung agar sesuai dengan dosen yang berkaitan.
+  - Fitur "Stop Kelas" diperbaiki sehingga hanya muncul untuk dosen yang memiliki kelas yang sedang berlangsung.
+  
+- **Implementasi Alert Login Gagal**:
+  - Dosen dan admin sekarang mendapatkan alert ketika login gagal. SweetAlert digunakan untuk menampilkan pesan interaktif.
+
+- **Modifikasi Tampilan Sidebar**:
+  - Menambahkan sidebar admin dan dosen yang lebih modern. Menghilangkan informasi user di sidebar dan menampilkan logo modern pada sidebar.
+  
+- **Pembuatan Login Dosen yang Serupa dengan Admin**:
+  - Membuat halaman login dosen dengan desain serupa seperti login admin, menggunakan elemen UI yang seragam dan responsif.
+
+- **Penyesuaian Tampilan Kelola Mahasiswa**:
+  - Menambahkan indikator status training pada halaman kelola mahasiswa dengan label hijau untuk yang sudah di-train, kuning untuk sedang training, dan merah untuk yang belum di-train.
+
+- **Sistem Siap untuk Di Uji**:
+  - Sistem sudah siap untuk diuji dengan berbagai macam skenario.

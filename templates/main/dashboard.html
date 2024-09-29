@@ -6,6 +6,7 @@
     <title>Dashboard Dosen - Sistem Absensi</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/dist/css/adminlte.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='admin_lte/plugins/fontawesome-free/css/all.min.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
 </head>
 <body class="hold-transition sidebar-mini">
 <div class="wrapper">
@@ -21,7 +22,7 @@
             <div class="container-fluid">
                 <div class="row mb-2">
                     <div class="col-sm-6">
-                        <h1>Dashboard Dosen</h1>
+                        <h1>Dashboard {{ session.get('dosen_name', 'Dosen') }}</h1>
                     </div>
                 </div>
             </div>
@@ -31,6 +32,7 @@
         <section class="content">
             <div class="container-fluid">
                 <div class="row">
+                    <!-- Kelas yang Diajar -->
                     <div class="col-lg-3 col-6">
                         <div class="small-box bg-info">
                             <div class="inner">
@@ -45,6 +47,8 @@
                             </a>
                         </div>
                     </div>
+
+                    <!-- Mahasiswa -->
                     <div class="col-lg-3 col-6">
                         <div class="small-box bg-success">
                             <div class="inner">
@@ -59,21 +63,50 @@
                             </a>
                         </div>
                     </div>
+
+                    <!-- Laporan Absensi -->
                     <div class="col-lg-3 col-6">
                         <div class="small-box bg-warning">
                             <div class="inner">
                                 <h3>{{ absensi_count }}</h3>
-                                <p>Rekap Absensi</p>
+                                <p>Laporan Absensi</p>
                             </div>
                             <div class="icon">
                                 <i class="fas fa-clipboard-list"></i>
                             </div>
-                            <a href="{{ url_for('dosen_absensi') }}" class="small-box-footer">
+                            <a href="{{ url_for('dosen_laporan_absensi') }}" class="small-box-footer">
                                 Info lebih lanjut <i class="fas fa-arrow-circle-right"></i>
                             </a>
                         </div>
                     </div>
                 </div>
+                <div class="row">
+                    <!-- Box Kelas Berlangsung -->
+                    <div class="col-lg-6 col-12">
+                        <div class="card card-danger">
+                            <div class="card-header">
+                                <h3 class="card-title">Kelas Berlangsung</h3>
+                            </div>
+                            <div class="card-body">
+                                {% if kelas_berlangsung %}
+                                    {% for kelas in kelas_berlangsung %}
+                                        <p>Kelas: {{ kelas.nama_kelas }} - Dosen: {{ kelas.dosen_pengampu }}</p>
+                                        <p>Jadwal: {{ kelas.hari }} {{ kelas.jam_mulai }} - {{ kelas.jam_selesai }}</p>
+                                        <p>Waktu Mulai: {{ kelas.waktu_mulai_absensi.strftime('%H:%M:%S') }}</p>
+                
+                                        {% if kelas.dosen_pengampu == dosen_name %}
+                                        <button class="btn btn-danger" onclick="stopKelas('{{ kelas._id }}')">
+                                            <i class="fas fa-stop"></i> Hentikan Kelas
+                                        </button>
+                                        {% endif %}
+                                    {% endfor %}
+                                {% else %}
+                                    <p>Tidak ada kelas yang sedang berlangsung.</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>                                            
             </div>
         </section>
     </div>
@@ -82,8 +115,59 @@
     {% include 'main/footer.html' %}
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="{{ url_for('static', filename='admin_lte/plugins/jquery/jquery.min.js') }}"></script>
 <script src="{{ url_for('static', filename='admin_lte/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
 <script src="{{ url_for('static', filename='admin_lte/dist/js/adminlte.min.js') }}"></script>
+
+<!-- Script untuk menghentikan kelas -->
+<script>
+    function stopKelas(kelas_id) {
+        Swal.fire({
+            title: 'Hentikan Kelas?',
+            text: "Apakah Anda yakin ingin menghentikan kelas ini?",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Ya, hentikan!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Lakukan AJAX untuk menghentikan kelas
+                $.ajax({
+                    url: "/dosen/stop_kelas/" + kelas_id,
+                    type: "POST",
+                    dataType: 'json',
+                    success: function (data) {
+                        if (data.success) {
+                            Swal.fire({
+                                title: 'Sukses',
+                                text: data.message,
+                                icon: 'success',
+                                timer: 3000,
+                                showConfirmButton: false
+                            });
+                            setTimeout(function() {
+                                window.location.reload(); // Reload halaman setelah sukses
+                            }, 3000);
+                        } else {
+                            Swal.fire({
+                                title: 'Error',
+                                text: data.message,
+                                icon: 'error',
+                                timer: 3000,
+                                showConfirmButton: false
+                            });
+                        }
+                    },
+                    error: function () {
+                        Swal.fire('Error', 'Gagal menghentikan kelas. Silakan coba lagi.', 'error');
+                    }
+                });
+            }
+        });
+    }
+</script>
 </body>
 </html>
