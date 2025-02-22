@@ -9,14 +9,15 @@ from datetime import datetime
 import os
 import shutil
 from werkzeug.utils import secure_filename
-from training.train_model import train_model  # panggil fungsi train
+from training.train_model import live_train_model
 from flask import session
 import threading
 import logging
 from bson import ObjectId
-import threading
 import locale
 import io
+from subprocess import Popen
+import psutil
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
@@ -24,8 +25,10 @@ app.secret_key = SECRET_KEY
 client = MongoClient(MONGO_URI)
 db = client[DB_NAME]
 
-
-locale.setlocale(locale.LC_TIME, 'id_ID.UTF-8')  # Set locale Indonesia
+try:
+    locale.setlocale(locale.LC_TIME, 'id_ID.UTF-8')
+except locale.Error:
+    locale.setlocale(locale.LC_TIME, 'C')  # Fallback ke default locale
 
 #########################################
 #Pada Bagian ini adalah rute untuk admin#
@@ -104,7 +107,6 @@ def tambah_mahasiswa():
             nama = request.form['nama']
             email = request.form['email']
             nomor_hp = request.form['nomor_hp']
-            foto_mahasiswa = request.files.getlist('foto_mahasiswa[]')
 
             # Cek apakah NIM sudah ada di database
             existing_mahasiswa = db.mahasiswa.find_one({'nim': nim})
@@ -120,25 +122,11 @@ def tambah_mahasiswa():
                 'nomor_hp': nomor_hp,
                 'trained': False
             }
-            inserted_mahasiswa = db.mahasiswa.insert_one(mahasiswa)
-            mahasiswa_id = str(inserted_mahasiswa.inserted_id)
+            db.mahasiswa.insert_one(mahasiswa)
 
-            # Proses unggah foto jika ada
-            if foto_mahasiswa and foto_mahasiswa[0].filename != '':
-                path = os.path.join('training/images', mahasiswa_id)
-                if not os.path.exists(path):
-                    os.makedirs(path)
-
-                for foto in foto_mahasiswa:
-                    if foto and foto.filename != '':
-                        filename = secure_filename(foto.filename)
-                        foto.save(os.path.join(path, filename))
-
-                flash('Mahasiswa berhasil ditambahkan. Foto telah diunggah dan siap untuk training.', 'success')
-            else:
-                flash('Mahasiswa berhasil ditambahkan. Tidak ada foto yang diunggah.', 'info')
-
+            flash('Mahasiswa berhasil ditambahkan.', 'success')
             return redirect(url_for('kelola_mahasiswa'))
+
         return render_template('admin/mahasiswa/tambah_mahasiswa.html')
     else:
         return redirect(url_for('admin_login'))
@@ -154,7 +142,6 @@ def edit_mahasiswa(id):
                 nama = request.form['nama']
                 email = request.form['email']
                 nomor_hp = request.form['nomor_hp']
-                foto_mahasiswa = request.files.getlist('foto_mahasiswa[]')
 
                 # Cek apakah NIM sudah ada di database dan bukan milik mahasiswa lain
                 existing_mahasiswa = db.mahasiswa.find_one({'nim': nim, '_id': {'$ne': ObjectId(id)}})
@@ -172,25 +159,9 @@ def edit_mahasiswa(id):
                     }
                 })
 
-                # Proses unggah foto jika ada
-                if foto_mahasiswa and foto_mahasiswa[0].filename != '':
-                    folder_path = os.path.join('training/images', str(mahasiswa['_id']))
-
-                    # Buat direktori jika belum ada
-                    if not os.path.exists(folder_path):
-                        os.makedirs(folder_path)
-
-                    # Simpan foto yang diunggah
-                    for foto in foto_mahasiswa:
-                        if foto and foto.filename != '':
-                            filename = secure_filename(foto.filename)
-                            foto.save(os.path.join(folder_path, filename))
-
-                    flash('Data mahasiswa berhasil diperbarui. Foto telah diunggah dan siap untuk training.', 'success')
-                else:
-                    flash('Data mahasiswa berhasil diperbarui.', 'success')
-
+                flash('Data mahasiswa berhasil diperbarui.', 'success')
                 return redirect(url_for('kelola_mahasiswa'))
+
             return render_template('admin/mahasiswa/edit_mahasiswa.html', mahasiswa=mahasiswa)
         else:
             flash('Mahasiswa tidak ditemukan.', 'danger')
@@ -198,33 +169,49 @@ def edit_mahasiswa(id):
     else:
         return redirect(url_for('admin_login'))
 
-# Training Foto Mahasiswa
+# Fungsi untuk menghentikan semua proses libcamera-vid yang berjalan
+def kill_existing_libcamera_processes():
+    """Menghentikan semua proses libcamera-vid yang berjalan."""
+    for process in psutil.process_iter(['pid', 'name']):
+        if 'libcamera-vid' in process.info['name']:
+            try:
+                process.terminate()
+                logging.info(f"[INFO] Menghentikan proses libcamera-vid dengan PID {process.info['pid']}")
+            except Exception as e:
+                logging.error(f"[ERROR] Gagal menghentikan proses libcamera-vid: {e}")
+
+# Training Mahasiswa dengan Live Training
 @app.route('/admin/train_mahasiswa/<id>', methods=['GET'])
 def train_mahasiswa(id):
     if 'admin_logged_in' in session:
         mahasiswa = db.mahasiswa.find_one({"_id": ObjectId(id)})
-        if mahasiswa:
-            folder_path = os.path.join('training/images', str(mahasiswa['_id']))
 
-            # Cek apakah folder ada dan tidak kosong
-            if not os.path.exists(folder_path) or len(os.listdir(folder_path)) < 10:
-                flash('Training gagal. Pastikan ada minimal 10 foto untuk mahasiswa ini.', 'danger')
+        if mahasiswa:
+            # Cek apakah training sedang berlangsung
+            if mahasiswa.get("training_in_progress", False):
+                flash(f'Training sedang berlangsung untuk Mahasiswa: {mahasiswa["nama"]} (NIM: {mahasiswa["nim"]})', 'warning')
                 return redirect(url_for('kelola_mahasiswa'))
 
             try:
-                # Update status di database
+                # Menghentikan semua proses libcamera-vid sebelum memulai training
+                kill_existing_libcamera_processes()
+
+                # Update status mahasiswa di database
                 db.mahasiswa.update_one({'_id': ObjectId(id)}, {"$set": {"training_in_progress": True}})
 
-                nim = mahasiswa['nim']  # Ambil NIM dari data mahasiswa
-                index = 0  # Atur index sesuai logika aplikasi Anda, misalnya urutan mahasiswa di database
-                
-                # Jalankan training di thread terpisah dengan nim dan index
-                training_thread = threading.Thread(target=background_training, args=(str(mahasiswa['_id']), folder_path, nim, index))
+                nim = mahasiswa['nim']
+                nama = mahasiswa['nama']
+
+                # Jalankan live training di thread terpisah
+                training_thread = threading.Thread(target=background_live_training, args=(str(mahasiswa['_id']), nim, nama))
                 training_thread.start()
 
-                flash(f'Training sedang berlangsung untuk Mahasiswa NIM {nim}', 'info')
+                flash(f'Live Training dimulai untuk Mahasiswa: {nama} (NIM: {nim})', 'info')
             except Exception as e:
-                flash(f'Training gagal: {str(e)}', 'danger')
+                logging.error(f'[ERROR] Training gagal untuk Mahasiswa ID {id}: {e}')
+                flash(f'Live Training gagal: {str(e)}', 'danger')
+                # Pastikan status training di-reset jika terjadi error
+                db.mahasiswa.update_one({'_id': ObjectId(id)}, {"$set": {"training_in_progress": False}})
 
         else:
             flash('Mahasiswa tidak ditemukan.', 'danger')
@@ -233,21 +220,22 @@ def train_mahasiswa(id):
     else:
         return redirect(url_for('admin_login'))
 
-# Fungsi untuk menjalankan training di latar belakang
-def background_training(mahasiswa_id, folder_path, nim, index):
+# Fungsi untuk menjalankan live training di latar belakang
+def background_live_training(mahasiswa_id, nim, nama):
+    """
+    Fungsi untuk menjalankan live training secara latar belakang.
+    """
     try:
-        logging.info(f'Training dimulai untuk Mahasiswa ID {mahasiswa_id} dengan NIM {nim}')
-        train_model(mahasiswa_id, nim, index)  # Panggil fungsi training dengan nim dan index
+        logging.info(f'[INFO] Live Training dimulai untuk Mahasiswa ID {mahasiswa_id}, NIM {nim}')
+
+        # Jalankan live training
+        live_train_model(mahasiswa_id, nim, nama)
+
+        # Update status mahasiswa di database setelah selesai
         db.mahasiswa.update_one({'_id': ObjectId(mahasiswa_id)}, {"$set": {"trained": True, "training_in_progress": False}})
-        logging.info(f'Training selesai untuk Mahasiswa ID {mahasiswa_id}, NIM {nim}')
-
-        # Hapus folder yang berisi foto setelah training selesai
-        if os.path.exists(folder_path):
-            shutil.rmtree(folder_path)
-            logging.info(f'Folder foto di {folder_path} berhasil dihapus.')
-
+        logging.info(f'[INFO] Live Training selesai untuk Mahasiswa ID {mahasiswa_id}, NIM {nim}')
     except Exception as e:
-        logging.error(f'Training gagal untuk Mahasiswa ID {mahasiswa_id}: {str(e)}')
+        logging.error(f'[ERROR] Live Training gagal untuk Mahasiswa ID {mahasiswa_id}: {e}')
         db.mahasiswa.update_one({'_id': ObjectId(mahasiswa_id)}, {"$set": {"training_in_progress": False}})
 
 # Hapus Mahasiswa
@@ -726,7 +714,7 @@ def unduh_laporan_absensi(absensi_id):
                 waktu_hadir = "N/A"
 
             data.append({
-                "NIM": mhs_data['nim'],
+                "NPM": mhs_data['nim'],
                 "Nama Mahasiswa": mhs_data['nama'],
                 "Status Kehadiran": status_kehadiran,
                 "Waktu Kehadiran": waktu_hadir
@@ -755,7 +743,7 @@ def unduh_laporan_absensi(absensi_id):
 
             # Tulis header tabel
             worksheet.write(4, 0, "No", header_format)
-            worksheet.write(4, 1, "NIM", header_format)
+            worksheet.write(4, 1, "NPM", header_format)
             worksheet.write(4, 2, "Nama Mahasiswa", header_format)
             worksheet.write(4, 3, "Status Kehadiran", header_format)
             worksheet.write(4, 4, "Waktu Kehadiran", header_format)
@@ -763,7 +751,7 @@ def unduh_laporan_absensi(absensi_id):
             # Tulis data absensi
             for idx, row in enumerate(df.itertuples(), start=1):
                 worksheet.write(idx + 4, 0, idx, border_format)
-                worksheet.write(idx + 4, 1, row.NIM, border_format)
+                worksheet.write(idx + 4, 1, row.NPM, border_format)
                 worksheet.write(idx + 4, 2, row._2, border_format)  # Nama Mahasiswa
                 worksheet.write(idx + 4, 3, row._3, border_format)  # Status Kehadiran
                 worksheet.write(idx + 4, 4, row._4, border_format)  # Waktu Kehadiran
@@ -852,7 +840,7 @@ def unduh_rekapitulasi_absensi(kelas_id):
 
             # Tulis header tabel dengan jarak ke bawah
             worksheet.write(row_offset, 0, "No", header_format)
-            worksheet.write(row_offset, 1, "NIM", header_format)
+            worksheet.write(row_offset, 1, "NPM", header_format)
             worksheet.write(row_offset, 2, "Nama Mahasiswa", header_format)
             for col_num, col_name in enumerate(tanggal_list):
                 worksheet.write(row_offset, col_num + 3, col_name, header_format)
@@ -1204,7 +1192,7 @@ def dosen_unduh_rekapitulasi_absensi(kelas_id):
             # Tulis header tabel absensi
             row_offset = 4
             worksheet.write(row_offset, 0, "No", header_format)
-            worksheet.write(row_offset, 1, "NIM", header_format)
+            worksheet.write(row_offset, 1, "NPM", header_format)
             worksheet.write(row_offset, 2, "Nama Mahasiswa", header_format)
             for col_num, col_name in enumerate(tanggal_list):
                 worksheet.write(row_offset, col_num + 3, col_name, header_format)
@@ -1278,7 +1266,7 @@ def dosen_unduh_laporan_absensi(absensi_id):
                 waktu_hadir = "N/A"
 
             data.append({
-                "NIM": mhs_data['nim'],
+                "NPM": mhs_data['nim'],
                 "Nama Mahasiswa": mhs_data['nama'],
                 "Status Kehadiran": status_kehadiran,
                 "Waktu Kehadiran": waktu_hadir
@@ -1306,7 +1294,7 @@ def dosen_unduh_laporan_absensi(absensi_id):
 
             # Tulis header tabel
             worksheet.write(4, 0, "No", header_format)
-            worksheet.write(4, 1, "NIM", header_format)
+            worksheet.write(4, 1, "NPM", header_format)
             worksheet.write(4, 2, "Nama Mahasiswa", header_format)
             worksheet.write(4, 3, "Status Kehadiran", header_format)
             worksheet.write(4, 4, "Waktu Kehadiran", header_format)
@@ -1327,8 +1315,18 @@ def dosen_unduh_laporan_absensi(absensi_id):
 
 # rute start dan stop absensi
 
-# variabel global rute absensi
+# Variabel global untuk proses face recognition
 face_recognition_process = None
+
+def kill_existing_libcamera_processes():
+    """Menghentikan semua proses libcamera-vid yang berjalan untuk mencegah konflik."""
+    for process in psutil.process_iter(['pid', 'name']):
+        if 'libcamera-vid' in process.info['name']:
+            try:
+                process.terminate()
+                logging.info(f"[INFO] Menghentikan proses libcamera-vid dengan PID {process.info['pid']}")
+            except Exception as e:
+                logging.error(f"[ERROR] Gagal menghentikan proses libcamera-vid: {e}")
 
 # Route untuk memulai absensi oleh admin
 @app.route('/admin/start_kelas/<kelas_id>', methods=['POST'])
@@ -1340,13 +1338,14 @@ def start_kelas(kelas_id):
     # Periksa jika tidak ada mahasiswa
     if not kelas['mahasiswa']:
         return jsonify({"success": False, "message": "Tidak ada mahasiswa di kelas ini"})
-    
+
     # Cek apakah ada kelas lain yang sedang berlangsung
     kelas_berlangsung = db.kelas.find_one({"status": "Berlangsung"})
     if kelas_berlangsung:
         return jsonify({"success": False, "message": f"Kelas {kelas_berlangsung['nama_kelas']} sedang berlangsung. Tidak dapat memulai kelas baru."})
 
-    # Hentikan proses face recognition sebelumnya jika ada
+    # Hentikan proses libcamera-vid dan face recognition yang berjalan sebelumnya
+    kill_existing_libcamera_processes()
     if face_recognition_process and face_recognition_process.poll() is None:
         face_recognition_process.terminate()
         face_recognition_process.wait()
@@ -1360,7 +1359,7 @@ def start_kelas(kelas_id):
 
     return jsonify({"success": True, "message": f"Kelas {kelas['nama_kelas']} dimulai."})
 
-# Route untuk menghentikan absensi
+# Route untuk menghentikan absensi oleh admin
 @app.route('/admin/stop_kelas/<kelas_id>', methods=['POST'])
 def stop_kelas(kelas_id):
     global face_recognition_process
@@ -1369,8 +1368,9 @@ def stop_kelas(kelas_id):
     kelas = db.kelas.find_one({"_id": ObjectId(kelas_id)})
 
     if kelas:
-        # Jika ada proses face recognition yang berjalan, hentikan prosesnya
-        if face_recognition_process is not None and face_recognition_process.poll() is None:
+        # Hentikan proses face recognition jika berjalan
+        kill_existing_libcamera_processes()
+        if face_recognition_process and face_recognition_process.poll() is None:
             face_recognition_process.terminate()
             face_recognition_process.wait()
             face_recognition_process = None
@@ -1387,7 +1387,6 @@ def stop_kelas(kelas_id):
             {"$set": {"status": "Tidak Berlangsung"}}
         )
 
-        # Kirim respons dengan nama kelas, bukan ID
         return jsonify({"success": True, "message": f"Proses face recognition untuk kelas {kelas['nama_kelas']} dihentikan."})
     else:
         return jsonify({"success": False, "message": "Kelas tidak ditemukan."})
@@ -1411,11 +1410,8 @@ def dosen_start_kelas(kelas_id):
         if kelas_berlangsung:
             return jsonify({"success": False, "message": f"Kelas {kelas_berlangsung['nama_kelas']} sedang berlangsung. Tidak dapat memulai kelas baru."})
 
-        # Periksa jika tidak ada mahasiswa di kelas ini
-        if not kelas['mahasiswa']:
-            return jsonify({"success": False, "message": "Tidak ada mahasiswa di kelas ini"})
-
-        # Hentikan proses face recognition sebelumnya jika ada
+        # Hentikan proses libcamera-vid dan face recognition yang berjalan sebelumnya
+        kill_existing_libcamera_processes()
         if face_recognition_process and face_recognition_process.poll() is None:
             face_recognition_process.terminate()
             face_recognition_process.wait()
@@ -1431,43 +1427,6 @@ def dosen_start_kelas(kelas_id):
         )
 
         return jsonify({"success": True, "message": f"Kelas {kelas['nama_kelas']} dimulai oleh dosen."})
-
-    else:
-        return redirect(url_for('dosen_login'))
-
-# Route untuk menghentikan absensi oleh dosen
-@app.route('/dosen/stop_kelas/<kelas_id>', methods=['POST'])
-def stop_kelas_dosen(kelas_id):
-    global face_recognition_process
-
-    if 'dosen_logged_in' in session:
-        dosen_id = session.get('dosen_id')
-
-        # Pastikan dosen hanya dapat menghentikan absensi kelas yang dia ajar
-        kelas = db.kelas.find_one({"_id": ObjectId(kelas_id), "dosen_pengampu": ObjectId(dosen_id)})
-
-        if not kelas:
-            return jsonify({"success": False, "message": "Kelas tidak ditemukan atau Anda tidak memiliki akses"})
-
-        # Jika ada proses face recognition yang berjalan, hentikan prosesnya
-        if face_recognition_process is not None and face_recognition_process.poll() is None:
-            face_recognition_process.terminate()
-            face_recognition_process.wait()
-            face_recognition_process = None
-            print("Proses face recognition dihentikan.")
-
-        # Update status kelas dan absensi di MongoDB
-        waktu_selesai_absensi = datetime.now()
-        db.absensi.update_one(
-            {"kelas_id": ObjectId(kelas_id), "status": "Berlangsung"},
-            {"$set": {"status": "Tidak Berlangsung", "waktu_selesai": waktu_selesai_absensi}}
-        )
-        db.kelas.update_one(
-            {"_id": ObjectId(kelas_id)},
-            {"$set": {"status": "Tidak Berlangsung"}}
-        )
-
-        return jsonify({"success": True, "message": f"Proses face recognition untuk kelas {kelas['nama_kelas']} dihentikan oleh dosen."})
 
     else:
         return redirect(url_for('dosen_login'))
