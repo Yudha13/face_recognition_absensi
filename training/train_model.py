@@ -1,148 +1,140 @@
-import os
 import cv2
 import numpy as np
-import shutil
-from bson import ObjectId
+import os
+import subprocess
+import psutil
+import logging
 
-# Fungsi untuk memperbaiki kualitas gambar dengan preprocessing
+# Konfigurasi logging untuk memantau aktivitas
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+def kill_existing_libcamera_processes():
+    """Menghentikan semua proses libcamera-vid yang berjalan."""
+    for process in psutil.process_iter(['pid', 'name']):
+        if 'libcamera-vid' in process.info['name']:
+            try:
+                process.terminate()
+                process.wait()  # Menunggu proses benar-benar dihentikan
+                logging.info(f"[INFO] Menghentikan proses libcamera-vid dengan PID {process.info['pid']}")
+            except Exception as e:
+                logging.error(f"[ERROR] Gagal menghentikan proses libcamera-vid: {e}")
+
 def enhance_image(image):
-    """Fungsi untuk memperbaiki kualitas gambar dengan beberapa preprocessing."""
-    image = cv2.equalizeHist(image)  # Histogram equalization untuk meningkatkan kontras
-    return image
+    """Fungsi untuk memperbaiki kualitas gambar dengan preprocessing."""
+    return cv2.equalizeHist(image)  # Histogram equalization untuk meningkatkan kontras
 
-# Fungsi untuk augmentasi gambar
 def augment_image(image):
     """Fungsi untuk melakukan augmentasi data sederhana."""
-    augmented_images = [image]
-    augmented_images.append(cv2.rotate(image, cv2.ROTATE_90_CLOCKWISE))
-    augmented_images.append(cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE))
-    augmented_images.append(cv2.flip(image, 1))  # Flip horizontal
+    augmented_images = [image, cv2.flip(image, 1)]  # Flip horizontal
     return augmented_images
 
-# Fungsi untuk pengecekan duplikasi wajah
-def check_if_face_exists(face_roi):
-    """Fungsi untuk mengecek apakah wajah sudah ada di model mahasiswa lain."""
-    recognizer = cv2.face.LBPHFaceRecognizer_create()
-    model_path = 'models/'
-    mahasiswa_models = os.listdir(model_path)
+def capture_frame_with_libcamera():
+    """Memulai proses pengambilan frame dengan libcamera-vid."""
+    kill_existing_libcamera_processes()  # Pastikan tidak ada proses kamera yang berjalan
+    command = [
+        "libcamera-vid",
+        "-n",
+        "--codec", "mjpeg",
+        "--width", "320",  # Resolusi lebih rendah untuk meningkatkan performa
+        "--height", "240",
+        "--framerate", "30",
+        "-t", "0",
+        "-o", "-"
+    ]
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=10**8)
+    return process
 
-    print(f"[DEBUG] Mulai pengecekan wajah di {len(mahasiswa_models)} model yang ada.")
-    
-    for model in mahasiswa_models:
-        model_full_path = os.path.join(model_path, model)
-        if os.path.isfile(model_full_path):
-            print(f"[DEBUG] Memuat model dari {model_full_path}")
-            recognizer.read(model_full_path)
-            
-            # Prediksi wajah menggunakan model yang ada
-            try:
-                label, confidence = recognizer.predict(face_roi)
-                print(f"[DEBUG] Hasil prediksi di model {model}: Label={label}, Confidence={confidence}")
+def live_train_model(mahasiswa_id, nim, nama, duration=30):
+    """
+    Fungsi untuk melatih model secara langsung menggunakan Raspberry Pi Camera.
+    Args:
+        mahasiswa_id: ID mahasiswa.
+        nim: NIM mahasiswa.
+        nama: Nama mahasiswa.
+        duration: Durasi live training dalam detik.
+    """
+    logging.info(f"[INFO] Memulai live training untuk mahasiswa: {nama} (ID: {mahasiswa_id}, NPM: {nim})")
 
-                # Jika confidence di bawah threshold, wajah sudah dikenali
-                if confidence < 80:  # Threshold dapat disesuaikan
-                    print(f"[ERROR] Wajah sudah dikenali dalam model {model} dengan confidence {confidence}. Training ditolak.")
-                    return True  # Duplikasi ditemukan, training ditolak
-                else:
-                    print(f"[INFO] Wajah tidak dikenali di model {model}, confidence terlalu tinggi: {confidence}")
-            except Exception as e:
-                print(f"[ERROR] Gagal melakukan prediksi di model {model}: {e}")
-    
-    return False
-
-# Fungsi untuk menghapus direktori foto
-def hapus_direktori_foto(mahasiswa_id):
-    """Menghapus direktori foto mahasiswa."""
-    folder_path = os.path.join('training/images', mahasiswa_id)
-    if os.path.exists(folder_path):
-        shutil.rmtree(folder_path)  # Hapus folder beserta isinya
-        print(f"[INFO] Folder foto untuk mahasiswa ID {mahasiswa_id} telah dihapus.")
-
-# Fungsi untuk melakukan training model
-def train_model(mahasiswa_id, nim, index):
-    """Melatih model dengan ObjectId sebagai label dan menggunakan NIM untuk penyimpanan file"""
-
-    if not ObjectId.is_valid(mahasiswa_id):
-        raise ValueError(f"ID Mahasiswa {mahasiswa_id} tidak valid.")
-    
-    mahasiswa_id_str = str(mahasiswa_id)
-    path = os.path.join('training/images', mahasiswa_id_str)
+    # Inisialisasi kamera
+    camera_process = capture_frame_with_libcamera()
+    face_cascade = cv2.CascadeClassifier('utils/haarcascade_frontalface_default.xml')
     images = []
     labels = []
-    
-    face_cascade = cv2.CascadeClassifier('utils/haarcascade_frontalface_default.xml')
-    processed_faces = set()
+    index = 0  # Label untuk mahasiswa ini
+    frame_count = 0
 
-    if not os.path.exists(path):
-        print(f"[ERROR] Path gambar tidak ditemukan: {path}")
-        return
+    start_time = cv2.getTickCount()
+    fps = cv2.getTickFrequency()
 
-    for filename in os.listdir(path):
-        img_path = os.path.join(path, filename)
-        img = cv2.imread(img_path)
+    try:
+        mjpeg_buffer = b""
+        while (cv2.getTickCount() - start_time) / fps < duration:
+            raw_data = camera_process.stdout.read(2048)
+            if not raw_data:
+                logging.error("[ERROR] Gagal membaca frame dari kamera.")
+                break
 
-        if img is not None:
-            print(f"[DEBUG] Memproses gambar: {filename}")
-            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=8, minSize=(720, 720))
+            mjpeg_buffer += raw_data
+            start_marker = mjpeg_buffer.find(b"\xff\xd8")
+            end_marker = mjpeg_buffer.find(b"\xff\xd9")
 
-            if len(faces) == 0:
-                print(f"[WARNING] Tidak ditemukan wajah di {filename}, melewatkan gambar ini.")
-                continue
+            if start_marker != -1 and end_marker != -1:
+                jpeg_data = mjpeg_buffer[start_marker:end_marker + 2]
+                mjpeg_buffer = mjpeg_buffer[end_marker + 2:]
+                frame = cv2.imdecode(np.frombuffer(jpeg_data, dtype=np.uint8), cv2.IMREAD_COLOR)
 
-            for (x, y, w, h) in faces:
-                face_roi = gray[y:y+h, x:x+w]
-                face_roi_resized = cv2.resize(face_roi, (720, 720))
+                if frame is not None:
+                    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=5, minSize=(50, 50))
 
-                print(f"[DEBUG] Memulai pengecekan wajah untuk file {filename}")
+                    for (x, y, w, h) in faces:
+                        face_roi = cv2.resize(gray[y:y+h, x:x+w], (100, 100))
+                        enhanced_face = enhance_image(face_roi)
+                        augmented_faces = augment_image(enhanced_face)
 
-                # Cek apakah wajah sudah ada di model mahasiswa lain
-                if check_if_face_exists(face_roi_resized):
-                    print(f"[ERROR] Proses training dihentikan karena wajah sudah ada di database untuk mahasiswa lain.")
-                    
-                    # Hapus direktori foto mahasiswa jika training gagal
-                    hapus_direktori_foto(mahasiswa_id_str)
-                    
-                    # Berikan pesan untuk mengunggah ulang foto
-                    raise ValueError(f"Training dihentikan karena duplikasi wajah. Silakan upload ulang foto.")
-                
-                # Enhance gambar sebelum augmentasi
-                enhanced_face = enhance_image(face_roi_resized)
-                
-                # Augmentasi dan tambahkan ke dataset
-                augmented_faces = augment_image(enhanced_face)
-                for aug_face in augmented_faces:
-                    face_hash = hash(aug_face.tobytes())
+                        for aug_face in augmented_faces:
+                            images.append(aug_face)
+                            labels.append(index)
 
-                    if face_hash in processed_faces:
-                        print(f"[INFO] Wajah di {filename} sudah diproses sebelumnya, melewatkan duplikasi.")
-                        continue
+                        # Gambarkan kotak wajah
+                        cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+                        cv2.putText(frame, f"Training: {nama} ({nim})", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-                    images.append(aug_face)
-                    labels.append(index)
-                    processed_faces.add(face_hash)
+                    frame_count += 1
+                    if frame_count % 10 == 0:
+                        progress = (frame_count / (duration * 30)) * 100
+                        cv2.putText(frame, f"Progress: {progress:.2f}%", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
-                    print(f"[DEBUG] Gambar berhasil diproses dan ditambahkan untuk training: {filename}")
-        else:
-            print(f"[ERROR] Gagal membaca gambar {filename}")
-            continue
+                    cv2.imshow("Live Training", frame)
 
-    if len(images) < 10:
-        # Jika foto kurang dari 10, hapus direktori foto mahasiswa dan berikan pesan error
-        hapus_direktori_foto(mahasiswa_id_str)
-        raise ValueError("Tidak cukup foto untuk training. Dibutuhkan minimal 10 foto. Silakan upload ulang.")
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    logging.info("[INFO] Proses live training dihentikan oleh pengguna.")
+                    break
 
-    print(f"[DEBUG] Jumlah gambar yang digunakan untuk training (termasuk augmentasi): {len(images)}")
+        if len(images) < 10:
+            raise ValueError("[ERROR] Data training kurang dari 10 gambar.")
 
-    # Training dengan LBPHFaceRecognizer
-    lbp = cv2.face.LBPHFaceRecognizer_create()
-    lbp.train(images, np.array(labels, dtype=np.int32))
+        logging.info(f"[INFO] Jumlah gambar untuk training: {len(images)}")
 
-    # Simpan model dengan NIM sebagai nama file
-    model_path = os.path.join('models', nim)
-    if not os.path.exists(model_path):
-        os.makedirs(model_path)
+        # Training dengan LBPHFaceRecognizer dengan parameter optimal
+        lbp = cv2.face.LBPHFaceRecognizer_create(radius=1, neighbors=8, grid_x=8, grid_y=8)
+        lbp.train(images, np.array(labels, dtype=np.int32))
 
-    model_filename = f'{nim}_model.yml'
-    lbp.save(os.path.join(model_path, model_filename))
-    print(f"[INFO] Model untuk mahasiswa dengan NIM {nim} berhasil dilatih dan disimpan di {model_path}")
+        # Simpan model dengan NIM sebagai nama file
+        model_path = os.path.join('models', nim)
+        if not os.path.exists(model_path):
+            os.makedirs(model_path)
+
+        model_filename = f'{nim}_model.yml'
+        lbp.save(os.path.join(model_path, model_filename))
+        logging.info(f"[INFO] Model berhasil disimpan di {model_path} untuk NIM: {nim}")
+
+    except Exception as e:
+        logging.error(f"[ERROR] Live training gagal: {e}")
+
+    finally:
+        camera_process.terminate()
+        camera_process.wait()
+        kill_existing_libcamera_processes()
+        cv2.destroyAllWindows()
+        logging.info("[INFO] Kamera ditutup, training selesai.")

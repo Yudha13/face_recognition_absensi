@@ -73,10 +73,10 @@
                         </div>
 
                         <!-- Form Start -->
-                        <form action="{{ url_for('tambah_mahasiswa') }}" method="POST" enctype="multipart/form-data">
+                        <form action="{{ url_for('tambah_mahasiswa') }}" method="POST">
                             <div class="card-body">
                                 <div class="form-group">
-                                    <label for="nim">NIM</label>
+                                    <label for="nim">NPM</label>
                                     <input type="text" name="nim" class="form-control" id="nim" required>
                                 </div>
                                 <div class="form-group">
@@ -90,13 +90,6 @@
                                 <div class="form-group">
                                     <label for="nomor_hp">Nomor HP</label>
                                     <input type="text" name="nomor_hp" class="form-control" id="nomor_hp" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="foto_mahasiswa">Unggah Foto Mahasiswa</label>
-                                    <div class="input-group">
-                                        <input type="file" class="form-control" id="foto_mahasiswa" name="foto_mahasiswa[]" multiple>
-                                    </div>
-                                    <small class="form-text text-muted">Unggah minimal 10 foto untuk model face recognition.</small>
                                 </div>
                             </div>
                             <!-- /.card-body -->
@@ -115,25 +108,8 @@
     <!-- Script untuk SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <!-- Script AdminLTE -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="{{ url_for('static', filename='admin_lte/plugins/jquery/jquery.min.js') }}"></script>
     <script src="{{ url_for('static', filename='admin_lte/plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
     <script src="{{ url_for('static', filename='admin_lte/dist/js/adminlte.min.js') }}"></script>
-     
-
-           <!-- SweetAlert2 untuk Pesan Flash -->
-           {% with messages = get_flashed_messages(with_categories=true) %}
-           {% if messages %}
-               <script>
-                   Swal.fire({
-                       icon: '{% if messages[0][0] == "success" %}success{% else %}error{% endif %}',
-                       title: 'Pemberitahuan',
-                       text: '{{ messages[0][1] }}',
-                       timer: 3000,
-                       showConfirmButton: false
-                   });
-               </script>
-           {% endif %}
-       {% endwith %}
 </body>
 </html>
