@@ -161,7 +161,7 @@ def run_face_recognition(kelas_id):
                                 best_confidence = confidence
                                 best_match_nim = nim
 
-                        if best_match_nim and best_confidence < 65:
+                        if best_match_nim and best_confidence < 80:
                             mahasiswa = nim_to_mahasiswa[best_match_nim]
                             if best_match_nim not in hadir_set:
                                 record_attendance(kelas_id, str(mahasiswa['_id']), datetime.now() > terlambat_limit)

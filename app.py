@@ -18,6 +18,8 @@ import locale
 import io
 from subprocess import Popen
 import psutil
+import time
+import cv2
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
@@ -169,17 +171,6 @@ def edit_mahasiswa(id):
     else:
         return redirect(url_for('admin_login'))
 
-# Fungsi untuk menghentikan semua proses libcamera-vid yang berjalan
-def kill_existing_libcamera_processes():
-    """Menghentikan semua proses libcamera-vid yang berjalan."""
-    for process in psutil.process_iter(['pid', 'name']):
-        if 'libcamera-vid' in process.info['name']:
-            try:
-                process.terminate()
-                logging.info(f"[INFO] Menghentikan proses libcamera-vid dengan PID {process.info['pid']}")
-            except Exception as e:
-                logging.error(f"[ERROR] Gagal menghentikan proses libcamera-vid: {e}")
-
 # Training Mahasiswa dengan Live Training
 @app.route('/admin/train_mahasiswa/<id>', methods=['GET'])
 def train_mahasiswa(id):
@@ -193,25 +184,40 @@ def train_mahasiswa(id):
                 return redirect(url_for('kelola_mahasiswa'))
 
             try:
-                # Menghentikan semua proses libcamera-vid sebelum memulai training
-                kill_existing_libcamera_processes()
-
-                # Update status mahasiswa di database
-                db.mahasiswa.update_one({'_id': ObjectId(id)}, {"$set": {"training_in_progress": True}})
+                # Update status mahasiswa di database agar tidak ada konflik
+                db.mahasiswa.update_one({'_id': ObjectId(id)}, {"$set": {"training_in_progress": True, "trained": False}})
 
                 nim = mahasiswa['nim']
                 nama = mahasiswa['nama']
 
-                # Jalankan live training di thread terpisah
-                training_thread = threading.Thread(target=background_live_training, args=(str(mahasiswa['_id']), nim, nama))
-                training_thread.start()
+                # Pastikan Python dari venv digunakan
+                venv_python = os.path.join(os.getcwd(), ".venv/bin/python3")
 
-                flash(f'Live Training dimulai untuk Mahasiswa: {nama} (NIM: {nim})', 'info')
+                # Jalankan training sebagai subprocess dan TUNGGU HINGGA SELESAI
+                process = subprocess.run(
+                    [venv_python, "training/train_model.py", id, nim, nama],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                )
+
+                # Logging hasil training
+                logging.info(f"[INFO] Training Output:\n{process.stdout}")
+                if process.stderr:
+                    logging.error(f"[ERROR] Training Error:\n{process.stderr}")
+
+                # 🔥 Cek apakah training benar-benar sukses
+                if process.returncode == 0:
+                    db.mahasiswa.update_one({'_id': ObjectId(id)}, {"$set": {"trained": True, "training_in_progress": False}})
+                    flash(f'Live Training selesai untuk Mahasiswa: {nama} (NIM: {nim})', 'success')
+                else:
+                    db.mahasiswa.update_one({'_id': ObjectId(id)}, {"$set": {"training_in_progress": False}})
+                    flash(f'Live Training gagal untuk Mahasiswa: {nama} (NIM: {nim})', 'danger')
+
             except Exception as e:
                 logging.error(f'[ERROR] Training gagal untuk Mahasiswa ID {id}: {e}')
                 flash(f'Live Training gagal: {str(e)}', 'danger')
-                # Pastikan status training di-reset jika terjadi error
-                db.mahasiswa.update_one({'_id': ObjectId(id)}, {"$set": {"training_in_progress": False}})
+                
+                # Jika ada error, pastikan status training tidak nyangkut
+                db.mahasiswa.update_one({'_id': ObjectId(id)}, {"$set": {"training_in_progress": False, "trained": False}})
 
         else:
             flash('Mahasiswa tidak ditemukan.', 'danger')
@@ -220,23 +226,6 @@ def train_mahasiswa(id):
     else:
         return redirect(url_for('admin_login'))
 
-# Fungsi untuk menjalankan live training di latar belakang
-def background_live_training(mahasiswa_id, nim, nama):
-    """
-    Fungsi untuk menjalankan live training secara latar belakang.
-    """
-    try:
-        logging.info(f'[INFO] Live Training dimulai untuk Mahasiswa ID {mahasiswa_id}, NIM {nim}')
-
-        # Jalankan live training
-        live_train_model(mahasiswa_id, nim, nama)
-
-        # Update status mahasiswa di database setelah selesai
-        db.mahasiswa.update_one({'_id': ObjectId(mahasiswa_id)}, {"$set": {"trained": True, "training_in_progress": False}})
-        logging.info(f'[INFO] Live Training selesai untuk Mahasiswa ID {mahasiswa_id}, NIM {nim}')
-    except Exception as e:
-        logging.error(f'[ERROR] Live Training gagal untuk Mahasiswa ID {mahasiswa_id}: {e}')
-        db.mahasiswa.update_one({'_id': ObjectId(mahasiswa_id)}, {"$set": {"training_in_progress": False}})
 
 # Hapus Mahasiswa
 @app.route('/admin/hapus_mahasiswa/<id>', methods=['POST', 'GET'])
@@ -1266,7 +1255,7 @@ def dosen_unduh_laporan_absensi(absensi_id):
                 waktu_hadir = "N/A"
 
             data.append({
-                "NPM": mhs_data['nim'],
+                "NIM": mhs_data['nim'],
                 "Nama Mahasiswa": mhs_data['nama'],
                 "Status Kehadiran": status_kehadiran,
                 "Waktu Kehadiran": waktu_hadir
@@ -1433,4 +1422,3 @@ def dosen_start_kelas(kelas_id):
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
-
